@@ -4,9 +4,8 @@
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs::{self, File};
-    use std::io::Write;
+    use std::io::{self, Write};
     use std::path::Path;
     use std::sync::Arc;
     
@@ -237,7 +236,8 @@ mod tests {
         // Parse the XML file to verify it's well-formed
         let file_content = fs::read_to_string(&output_file)?;
         let mut reader = Reader::from_str(&file_content);
-        reader.trim_text(true);
+        // Note: trim_text method was removed in newer quick-xml versions
+        // reader.trim_text(true);
         
         let mut depth = 0;
         let mut buf = Vec::new();

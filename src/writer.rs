@@ -4,7 +4,6 @@
 
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
-use std::path::Path;
 
 use chrono::Local;
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
@@ -33,8 +32,8 @@ impl XmlWriter {
         
         // Write XML declaration
         xml_writer.write_event(Event::Decl(BytesDecl::new(
-            "1.0".as_bytes(),
-            Some("UTF-8".as_bytes()),
+            "1.0",
+            Some("UTF-8"),
             None
         )))?;
         
@@ -123,10 +122,15 @@ impl XmlWriter {
         // Write metadata
         self.write_metadata(&file.metadata, writer)?;
         
-        // Write content with CDATA
+        // Write content
         writer.write_event(Event::Start(BytesStart::new("content")))?;
         if let Some(content) = &file.content {
-            writer.write_event(Event::CData(BytesText::new(content)))?;
+            // Split content into chunks and write as text events to avoid XML parsing issues
+            for chunk in content.as_bytes().chunks(4096) {
+                if let Ok(text) = std::str::from_utf8(chunk) {
+                    writer.write_event(Event::Text(BytesText::new(text)))?;
+                }
+            }
         }
         writer.write_event(Event::End(BytesEnd::new("content")))?;
         

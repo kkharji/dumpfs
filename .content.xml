@@ -1,0 +1,1454 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<directory_scan timestamp="2025-03-26T22:44:11.973663530+03:00">
+  <system_info>
+    <hostname>penzu</hostname>
+    <os>linux</os>
+    <kernel>unix</kernel>
+  </system_info>
+  <directory name="dumpfs" path="dumpfs">
+    <metadata>
+      <size>104</size>
+      <modified>2025-03-26T22:39:03.097666583+03:00</modified>
+      <permissions>755</permissions>
+    </metadata>
+    <contents>
+      <directory name="src" path="dumpfs/src">
+        <metadata>
+          <size>130</size>
+          <modified>2025-03-26T22:38:43.199656744+03:00</modified>
+          <permissions>755</permissions>
+        </metadata>
+        <contents>
+          <file name="main.rs" path="dumpfs/src/main.rs">
+            <metadata>
+              <size>2004</size>
+              <modified>2025-03-26T22:38:09.623638277+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Command-line interface for DumpFS
+ */
+
+use std::io;
+use std::sync::Arc;
+use std::time::Instant;
+
+use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::ThreadPoolBuilder;
+
+use dumpfs::config::{Args, Config};
+use dumpfs::scanner::Scanner;
+use dumpfs::utils::count_files;
+use dumpfs::writer::XmlWriter;
+
+fn main() -&gt; io::Result&lt;()&gt; {
+    // Parse command line arguments
+    let args = Args::parse();
+    
+    // Create configuration
+    let config = Config::from_args(args);
+    
+    // Validate configuration
+    config.validate()?;
+    
+    // Configure thread pool
+    if let Err(e) = ThreadPoolBuilder::new()
+        .num_threads(config.num_threads)
+        .build_global() {
+        eprintln!(&quot;Warning: Failed to set thread pool size: {}&quot;, e);
+    }
+    
+    println!(&quot;Scanning directory: {}&quot;, config.target_dir.display());
+    
+    // Count files for progress tracking
+    let total_files = match count_files(&amp;config.target_dir, &amp;config) {
+        Ok(count) =&gt; {
+            println!(&quot;Found {} files to process&quot;, count);
+            count
+        },
+        Err(e) =&gt; {
+            eprintln!(&quot;Warning: Failed to count files: {}&quot;, e);
+            0
+        }
+    };
+    
+    // Create progress bar
+    let progress = ProgressBar::new(total_files);
+    progress.set_style(ProgressStyle::default_bar()
+        .template(&quot;[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})&quot;)
+        .unwrap()
+        .progress_chars(&quot;#&gt;-&quot;));
+    
+    // Create scanner and writer
+    let scanner = Scanner::new(config.clone(), Arc::new(progress.clone()));
+    let writer = XmlWriter::new(config.clone());
+    
+    // Scan directory
+    let start_time = Instant::now();
+    let root_node = scanner.scan()?;
+    
+    // Write XML output
+    writer.write(&amp;root_node)?;
+    
+    // Finish progress
+    progress.finish_with_message(format!(
+        &quot;Directory content extracted to {} in {:.2?}&quot;,
+        config.output_file.display(),
+        start_time.elapsed()
+    ));
+    
+    Ok(())
+}
+</content>
+          </file>
+          <file name="types.rs" path="dumpfs/src/types.rs">
+            <metadata>
+              <size>2152</size>
+              <modified>2025-03-26T22:36:05.617711743+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Core types and data structures for the DumpFS application
+ */
+
+use std::path::PathBuf;
+use std::time::SystemTime;
+
+/// Represents different types of filesystem entries
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileType {
+    /// Text file with readable content
+    TextFile,
+    /// Binary file (non-text)
+    BinaryFile,
+    /// Symbolic link to another file
+    Symlink,
+    /// Directory containing other entries
+    Directory,
+    /// Other file types
+    Other,
+}
+
+/// Metadata about a filesystem entry
+#[derive(Debug, Clone)]
+pub struct Metadata {
+    /// Size in bytes
+    pub size: u64,
+    /// Last modification time
+    pub modified: SystemTime,
+    /// File permissions in octal format
+    pub permissions: String,
+}
+
+/// Represents a directory in the file system
+#[derive(Debug, Clone)]
+pub struct DirectoryNode {
+    /// Directory name
+    pub name: String,
+    /// Relative path from scan root
+    pub path: PathBuf,
+    /// Directory metadata
+    pub metadata: Metadata,
+    /// Directory contents
+    pub contents: Vec&lt;Node&gt;,
+}
+
+/// Represents a text file
+#[derive(Debug, Clone)]
+pub struct FileNode {
+    /// File name
+    pub name: String,
+    /// Relative path from scan root
+    pub path: PathBuf,
+    /// File metadata
+    pub metadata: Metadata,
+    /// File content (may be None if too large)
+    pub content: Option&lt;String&gt;,
+}
+
+/// Represents a binary file
+#[derive(Debug, Clone)]
+pub struct BinaryNode {
+    /// File name
+    pub name: String,
+    /// Relative path from scan root
+    pub path: PathBuf,
+    /// File metadata
+    pub metadata: Metadata,
+}
+
+/// Represents a symbolic link
+#[derive(Debug, Clone)]
+pub struct SymlinkNode {
+    /// Link name
+    pub name: String,
+    /// Relative path from scan root
+    pub path: PathBuf,
+    /// Link metadata
+    pub metadata: Metadata,
+    /// Target of the symlink
+    pub target: String,
+}
+
+/// A generic filesystem node
+#[derive(Debug, Clone)]
+pub enum Node {
+    /// Directory node
+    Directory(DirectoryNode),
+    /// Text file node
+    File(FileNode),
+    /// Binary file node
+    Binary(BinaryNode),
+    /// Symbolic link node
+    Symlink(SymlinkNode),
+}
+</content>
+          </file>
+          <file name="config.rs" path="dumpfs/src/config.rs">
+            <metadata>
+              <size>2828</size>
+              <modified>2025-03-26T22:36:18.074703087+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Configuration handling for DumpFS
+ */
+
+use std::io;
+use std::path::PathBuf;
+
+use clap::Parser;
+
+/// Command-line arguments for DumpFS
+#[derive(Parser, Debug)]
+#[clap(
+    name = &quot;dumpfs&quot;,
+    version = env!(&quot;CARGO_PKG_VERSION&quot;),
+    about = &quot;Generate XML representation of directory contents for LLM context&quot;,
+    long_about = &quot;Creates an XML representation of a directory structure and its contents, designed for providing context to Large Language Models (LLMs).&quot;
+)]
+pub struct Args {
+    /// Target directory to process
+    #[clap(default_value = &quot;.&quot;)]
+    pub directory_path: String,
+
+    /// Output XML file name
+    #[clap(default_value = &quot;.content.xml&quot;)]
+    pub output_file: String,
+
+    /// Comma-separated list of patterns to ignore
+    #[clap(long, value_delimiter = &apos;,&apos;)]
+    pub ignore_patterns: Vec&lt;String&gt;,
+
+    /// Comma-separated list of patterns to include (if specified, only matching files are included)
+    #[clap(long, value_delimiter = &apos;,&apos;)]
+    pub include_patterns: Vec&lt;String&gt;,
+
+    /// Number of threads to use for processing
+    #[clap(long, default_value = &quot;4&quot;)]
+    pub threads: usize,
+}
+
+/// Application configuration
+#[derive(Clone, Debug)]
+pub struct Config {
+    /// Target directory to process
+    pub target_dir: PathBuf,
+    
+    /// Output XML file path
+    pub output_file: PathBuf,
+    
+    /// Patterns to ignore
+    pub ignore_patterns: Vec&lt;String&gt;,
+    
+    /// Patterns to include (if empty, include all)
+    pub include_patterns: Vec&lt;String&gt;,
+    
+    /// Number of threads to use for processing
+    pub num_threads: usize,
+}
+
+impl Config {
+    /// Create configuration from command-line arguments
+    pub fn from_args(args: Args) -&gt; Self {
+        Self {
+            target_dir: PathBuf::from(args.directory_path),
+            output_file: PathBuf::from(args.output_file),
+            ignore_patterns: args.ignore_patterns,
+            include_patterns: args.include_patterns,
+            num_threads: args.threads,
+        }
+    }
+
+    /// Validate the configuration
+    pub fn validate(&amp;self) -&gt; io::Result&lt;()&gt; {
+        // Check if target directory exists and is readable
+        if !self.target_dir.exists() || !self.target_dir.is_dir() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(&quot;Target directory not found: {}&quot;, self.target_dir.display())
+            ));
+        }
+        
+        // Check if output file directory exists and is writable
+        if let Some(parent) = self.output_file.parent() {
+            if !parent.exists() &amp;&amp; parent != PathBuf::from(&quot;&quot;) {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(&quot;Output directory not found: {}&quot;, parent.display())
+                ));
+            }
+        }
+        
+        Ok(())
+    }
+}
+</content>
+          </file>
+          <file name="utils.rs" path="dumpfs/src/utils.rs">
+            <metadata>
+              <size>3989</size>
+              <modified>2025-03-26T22:38:53.713662042+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Utility functions for DumpFS
+ */
+
+use std::io;
+use std::path::Path;
+use std::sync::Arc;
+
+use indicatif::ProgressBar;
+use once_cell::sync::Lazy;
+use walkdir::WalkDir;
+
+use crate::config::Config;
+use crate::scanner::Scanner;
+
+/// Count total files for progress tracking
+pub fn count_files(dir: &amp;Path, config: &amp;Config) -&gt; io::Result&lt;u64&gt; {
+    let scanner = Scanner::new(config.clone(), Arc::new(ProgressBar::hidden()));
+
+    let mut count = 0;
+
+    for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
+        if entry.file_type().is_file()
+            &amp;&amp; !scanner.should_ignore(entry.path())
+            &amp;&amp; scanner.should_include(entry.path())
+        {
+            count += 1;
+        }
+    }
+
+    Ok(count)
+}
+
+/// Format a human-readable file size
+pub fn format_file_size(size: u64) -&gt; String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if size &gt;= GB {
+        format!(&quot;{:.2} GB&quot;, size as f64 / GB as f64)
+    } else if size &gt;= MB {
+        format!(&quot;{:.2} MB&quot;, size as f64 / MB as f64)
+    } else if size &gt;= KB {
+        format!(&quot;{:.2} KB&quot;, size as f64 / KB as f64)
+    } else {
+        format!(&quot;{} bytes&quot;, size)
+    }
+}
+
+/// Default patterns to ignore
+pub static DEFAULT_IGNORE: Lazy&lt;Vec&lt;&amp;&apos;static str&gt;&gt; = Lazy::new(|| {
+    vec![
+        // Version Control
+        &quot;.git&quot;,
+        &quot;.svn&quot;,
+        &quot;.hg&quot;,
+        &quot;.bzr&quot;,
+        &quot;.gitignore&quot;,
+        &quot;.gitattributes&quot;,
+        // OS Files
+        &quot;.DS_Store&quot;,
+        &quot;Thumbs.db&quot;,
+        &quot;desktop.ini&quot;,
+        &quot;ehthumbs.db&quot;,
+        &quot;*.lnk&quot;,
+        &quot;*.url&quot;,
+        &quot;.directory&quot;,
+        // Dependencies
+        &quot;node_modules&quot;,
+        &quot;bower_components&quot;,
+        &quot;.npm&quot;,
+        &quot;package-lock.json&quot;,
+        &quot;yarn.lock&quot;,
+        &quot;.yarn&quot;,
+        &quot;vendor&quot;,
+        &quot;composer.lock&quot;,
+        &quot;.pnpm-store&quot;,
+        // Build &amp; Dist
+        &quot;dist&quot;,
+        &quot;build&quot;,
+        &quot;out&quot;,
+        &quot;bin&quot;,
+        &quot;release&quot;,
+        &quot;*.min.js&quot;,
+        &quot;*.min.css&quot;,
+        &quot;bundle.*&quot;,
+        // Python
+        &quot;__pycache__&quot;,
+        &quot;.pytest_cache&quot;,
+        &quot;.coverage&quot;,
+        &quot;venv&quot;,
+        &quot;env&quot;,
+        &quot;.env&quot;,
+        &quot;.venv&quot;,
+        &quot;*.pyc&quot;,
+        &quot;*.pyo&quot;,
+        &quot;*.pyd&quot;,
+        &quot;.python-version&quot;,
+        &quot;*.egg-info&quot;,
+        &quot;*.egg&quot;,
+        &quot;develop-eggs&quot;,
+        // Rust
+        &quot;target&quot;,
+        &quot;Cargo.lock&quot;,
+        &quot;.cargo&quot;,
+        // IDEs &amp; Editors
+        &quot;.idea&quot;,
+        &quot;.vscode&quot;,
+        &quot;.vs&quot;,
+        &quot;.sublime-*&quot;,
+        &quot;*.swp&quot;,
+        &quot;*.swo&quot;,
+        &quot;*~&quot;,
+        &quot;.project&quot;,
+        &quot;.settings&quot;,
+        &quot;.classpath&quot;,
+        &quot;.factorypath&quot;,
+        &quot;*.iml&quot;,
+        &quot;*.iws&quot;,
+        &quot;*.ipr&quot;,
+        // Caches &amp; Temp
+        &quot;.cache&quot;,
+        &quot;tmp&quot;,
+        &quot;temp&quot;,
+        &quot;logs&quot;,
+        &quot;.sass-cache&quot;,
+        &quot;.eslintcache&quot;,
+        &quot;*.log&quot;,
+        &quot;npm-debug.log*&quot;,
+        &quot;yarn-debug.log*&quot;,
+        &quot;yarn-error.log*&quot;,
+        // Other Build Tools
+        &quot;.gradle&quot;,
+        &quot;gradle&quot;,
+        &quot;.maven&quot;,
+        &quot;.m2&quot;,
+        &quot;*.class&quot;,
+        &quot;*.jar&quot;,
+        &quot;*.war&quot;,
+        &quot;*.ear&quot;,
+        // JavaScript/TypeScript
+        &quot;coverage&quot;,
+        &quot;.nyc_output&quot;,
+        &quot;.next&quot;,
+        &quot;*.tsbuildinfo&quot;,
+        &quot;.nuxt&quot;,
+        &quot;.output&quot;,
+        // .NET
+        &quot;bin&quot;,
+        &quot;obj&quot;,
+        &quot;Debug&quot;,
+        &quot;Release&quot;,
+        &quot;packages&quot;,
+        &quot;*.suo&quot;,
+        &quot;*.user&quot;,
+        &quot;*.pubxml&quot;,
+        &quot;*.pubxml.user&quot;,
+        // Documentation
+        &quot;_site&quot;,
+        &quot;.jekyll-cache&quot;,
+        &quot;.docusaurus&quot;,
+        // Mobile Development
+        &quot;.gradle&quot;,
+        &quot;build&quot;,
+        &quot;xcuserdata&quot;,
+        &quot;*.xcworkspace&quot;,
+        &quot;Pods/&quot;,
+        &quot;.expo&quot;,
+        // Database
+        &quot;*.sqlite&quot;,
+        &quot;*.sqlite3&quot;,
+        &quot;*.db&quot;,
+        // Archives
+        &quot;*.zip&quot;,
+        &quot;*.tar.gz&quot;,
+        &quot;*.tgz&quot;,
+        &quot;*.rar&quot;,
+        // Kubernetes
+        &quot;.kube&quot;,
+        &quot;*.kubeconfig&quot;,
+        // Terraform
+        &quot;.terraform&quot;,
+        &quot;*.tfstate&quot;,
+        &quot;*.tfvars&quot;,
+        // Ansible
+        &quot;*.retry&quot;,
+    ]
+});
+</content>
+          </file>
+          <file name="scanner.rs" path="dumpfs/src/scanner.rs">
+            <metadata>
+              <size>9260</size>
+              <modified>2025-03-26T22:43:14.337732555+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Directory and file scanning functionality
+ */
+
+use std::fs::{self, File};
+use std::io::{self, Read};
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::sync::Arc; // Import trait for permissions.mode()
+
+use glob_match::glob_match;
+use indicatif::ProgressBar;
+use rayon::prelude::*;
+use walkdir::{DirEntry, WalkDir};
+
+use crate::config::Config;
+use crate::types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
+use crate::utils::{format_file_size, DEFAULT_IGNORE};
+
+/// Scanner for directory contents
+pub struct Scanner {
+    /// Scanner configuration
+    config: Config,
+    /// Progress bar
+    pub progress: Arc&lt;ProgressBar&gt;,
+}
+
+impl Scanner {
+    /// Create a new scanner
+    pub fn new(config: Config, progress: Arc&lt;ProgressBar&gt;) -&gt; Self {
+        Self { config, progress }
+    }
+
+    /// Scan the target directory and return the directory tree
+    pub fn scan(&amp;self) -&gt; io::Result&lt;DirectoryNode&gt; {
+        let abs_path = fs::canonicalize(&amp;self.config.target_dir)?;
+        let dir_name = abs_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        self.scan_directory(&amp;abs_path, &amp;PathBuf::from(&amp;dir_name))
+    }
+
+    /// Scan a directory and return its node representation
+    fn scan_directory(&amp;self, abs_path: &amp;Path, rel_path: &amp;Path) -&gt; io::Result&lt;DirectoryNode&gt; {
+        let metadata = self.get_metadata(abs_path)?;
+        let mut contents = Vec::new();
+
+        // Collect all entries first
+        let entries: Vec&lt;DirEntry&gt; = WalkDir::new(abs_path)
+            .max_depth(1)
+            .min_depth(1)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| !self.should_ignore(e.path()))
+            .filter(|e| self.should_include(e.path()))
+            .collect();
+
+        // Split into directories and files
+        let (dirs, files): (Vec&lt;_&gt;, Vec&lt;_&gt;) =
+            entries.into_iter().partition(|e| e.file_type().is_dir());
+
+        // Process directories first (sequential)
+        for entry in dirs {
+            let entry_name = entry.file_name().to_string_lossy().to_string();
+            let new_rel_path = rel_path.join(&amp;entry_name);
+
+            match self.scan_directory(entry.path(), &amp;new_rel_path) {
+                Ok(dir_node) =&gt; contents.push(Node::Directory(dir_node)),
+                Err(e) =&gt; eprintln!(
+                    &quot;Error processing directory {}: {}&quot;,
+                    entry.path().display(),
+                    e
+                ),
+            }
+        }
+
+        // Process files in parallel
+        let file_nodes: Vec&lt;Node&gt; = files
+            .par_iter()
+            .filter_map(|entry| {
+                let entry_name = entry.file_name().to_string_lossy().to_string();
+                let new_rel_path = rel_path.join(&amp;entry_name);
+
+                match self.process_file(entry.path(), &amp;new_rel_path) {
+                    Ok(node) =&gt; Some(node),
+                    Err(e) =&gt; {
+                        eprintln!(&quot;Error processing {}: {}&quot;, entry.path().display(), e);
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        contents.extend(file_nodes);
+
+        Ok(DirectoryNode {
+            name: abs_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+            path: rel_path.to_path_buf(),
+            metadata,
+            contents,
+        })
+    }
+
+    /// Process a single file and return its node representation
+    fn process_file(&amp;self, abs_path: &amp;Path, rel_path: &amp;Path) -&gt; io::Result&lt;Node&gt; {
+        self.progress.inc(1);
+
+        let file_type = self.get_file_type(abs_path)?;
+        let metadata = self.get_metadata(abs_path)?;
+        let file_name = abs_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        match file_type {
+            FileType::TextFile =&gt; {
+                let content = self.read_file_content(abs_path)?;
+                Ok(Node::File(FileNode {
+                    name: file_name,
+                    path: rel_path.to_path_buf(),
+                    metadata,
+                    content,
+                }))
+            }
+            FileType::BinaryFile =&gt; Ok(Node::Binary(BinaryNode {
+                name: file_name,
+                path: rel_path.to_path_buf(),
+                metadata,
+            })),
+            FileType::Symlink =&gt; {
+                let target = fs::read_link(abs_path)?.to_string_lossy().to_string();
+
+                Ok(Node::Symlink(SymlinkNode {
+                    name: file_name,
+                    path: rel_path.to_path_buf(),
+                    metadata,
+                    target,
+                }))
+            }
+            _ =&gt; Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!(&quot;Unexpected file type for {}&quot;, abs_path.display()),
+            )),
+        }
+    }
+
+    /// Check if a file should be ignored based on patterns and defaults
+    pub fn should_ignore(&amp;self, path: &amp;Path) -&gt; bool {
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+
+        // Check custom ignore patterns
+        for pattern in &amp;self.config.ignore_patterns {
+            if glob_match(pattern, &amp;file_name) {
+                return true;
+            }
+        }
+
+        // Check default ignore patterns
+        if DEFAULT_IGNORE.iter().any(|&amp;p| p == file_name) {
+            return true;
+        }
+
+        // Don&apos;t process the output file itself
+        if path.ends_with(&amp;self.config.output_file) {
+            return true;
+        }
+
+        false
+    }
+
+    /// Check if a file should be included based on patterns
+    pub fn should_include(&amp;self, path: &amp;Path) -&gt; bool {
+        // If no include patterns, include everything
+        if self.config.include_patterns.is_empty() {
+            return true;
+        }
+
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+
+        // Check against include patterns
+        for pattern in &amp;self.config.include_patterns {
+            if glob_match(pattern, &amp;file_name) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Determine the type of a file
+    fn get_file_type(&amp;self, path: &amp;Path) -&gt; io::Result&lt;FileType&gt; {
+        let metadata = fs::metadata(path)?;
+
+        if metadata.is_dir() {
+            return Ok(FileType::Directory);
+        }
+
+        if metadata.file_type().is_symlink() {
+            return Ok(FileType::Symlink);
+        }
+
+        if metadata.is_file() {
+            // For smaller files, try to detect if they&apos;re text
+            if metadata.len() &lt; 8_000_000 {
+                // Read a sample of the file to determine type
+                let mut buffer = vec![0; std::cmp::min(8192, metadata.len() as usize)];
+                if !buffer.is_empty() {
+                    let mut file = File::open(path)?;
+                    let bytes_read = file.read(&amp;mut buffer)?;
+                    buffer.truncate(bytes_read);
+
+                    // Simple heuristic for text files: check for valid UTF-8 and high text-to-binary ratio
+                    if let Ok(_) = String::from_utf8(buffer.clone()) {
+                        // Count binary characters (0x00-0x08, 0x0E-0x1F)
+                        let binary_count = buffer
+                            .iter()
+                            .filter(|&amp;&amp;b| (b &lt; 9) || (b &gt; 13 &amp;&amp; b &lt; 32))
+                            .count();
+                        let binary_ratio = binary_count as f32 / buffer.len() as f32;
+
+                        if binary_ratio &lt; 0.1 {
+                            return Ok(FileType::TextFile);
+                        }
+                    }
+                }
+            }
+
+            // Default to binary for any non-text file
+            return Ok(FileType::BinaryFile);
+        }
+
+        Ok(FileType::Other)
+    }
+
+    /// Extract metadata from a file
+    fn get_metadata(&amp;self, path: &amp;Path) -&gt; io::Result&lt;Metadata&gt; {
+        let fs_metadata = fs::metadata(path)?;
+
+        Ok(Metadata {
+            size: fs_metadata.len(),
+            modified: fs_metadata.modified()?,
+            permissions: format!(&quot;{:o}&quot;, fs_metadata.permissions().mode() &amp; 0o777),
+        })
+    }
+
+    /// Read the content of a text file
+    fn read_file_content(&amp;self, path: &amp;Path) -&gt; io::Result&lt;Option&lt;String&gt;&gt; {
+        let metadata = fs::metadata(path)?;
+
+        // Skip large files
+        if metadata.len() &gt; 1_048_576 {
+            // 1MB limit
+            return Ok(Some(format!(
+                &quot;File too large to include content. Size: {}&quot;,
+                format_file_size(metadata.len())
+            )));
+        }
+
+        // Read file content
+        let mut content = String::new();
+        match File::open(path) {
+            Ok(mut file) =&gt; {
+                if let Err(e) = file.read_to_string(&amp;mut content) {
+                    return Ok(Some(format!(&quot;Failed to read file content: {}&quot;, e)));
+                }
+            }
+            Err(e) =&gt; {
+                return Ok(Some(format!(&quot;Failed to open file: {}&quot;, e)));
+            }
+        }
+
+        Ok(Some(content))
+    }
+}
+</content>
+          </file>
+          <file name="writer.rs" path="dumpfs/src/writer.rs">
+            <metadata>
+              <size>7930</size>
+              <modified>2025-03-26T22:44:00.817735134+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * XML writer implementation for DumpFS
+ */
+
+use std::fs::File;
+use std::io::{self, BufWriter, Write};
+
+use chrono::Local;
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::Writer;
+
+use crate::config::Config;
+use crate::types::{BinaryNode, DirectoryNode, FileNode, Metadata, Node, SymlinkNode};
+
+/// XML writer for directory contents
+pub struct XmlWriter {
+    /// Writer configuration
+    config: Config,
+}
+
+impl XmlWriter {
+    /// Create a new XML writer
+    pub fn new(config: Config) -&gt; Self {
+        Self { config }
+    }
+    
+    /// Write the directory tree to an XML file
+    pub fn write(&amp;self, root_node: &amp;DirectoryNode) -&gt; io::Result&lt;()&gt; {
+        let file = File::create(&amp;self.config.output_file)?;
+        let writer = BufWriter::new(file);
+        let mut xml_writer = Writer::new_with_indent(writer, b&apos; &apos;, 2);
+        
+        // Write XML declaration
+        xml_writer.write_event(Event::Decl(BytesDecl::new(
+            &quot;1.0&quot;,
+            Some(&quot;UTF-8&quot;),
+            None
+        )))?;
+        
+        // Start directory_scan element with timestamp
+        let mut start_tag = BytesStart::new(&quot;directory_scan&quot;);
+        let timestamp = Local::now().to_rfc3339();
+        start_tag.push_attribute((&quot;timestamp&quot;, timestamp.as_str()));
+        xml_writer.write_event(Event::Start(start_tag))?;
+        
+        // Write system info
+        self.write_system_info(&amp;mut xml_writer)?;
+        
+        // Write directory structure
+        self.write_directory(root_node, &amp;mut xml_writer)?;
+        
+        // End directory_scan element
+        xml_writer.write_event(Event::End(BytesEnd::new(&quot;directory_scan&quot;)))?;
+        
+        Ok(())
+    }
+    
+    /// Write system information to XML
+    fn write_system_info&lt;W: Write&gt;(&amp;self, writer: &amp;mut Writer&lt;W&gt;) -&gt; io::Result&lt;()&gt; {
+        writer.write_event(Event::Start(BytesStart::new(&quot;system_info&quot;)))?;
+        
+        // Write hostname
+        writer.write_event(Event::Start(BytesStart::new(&quot;hostname&quot;)))?;
+        let hostname = hostname::get()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|_| &quot;unknown&quot;.to_string());
+        writer.write_event(Event::Text(BytesText::new(&amp;hostname)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;hostname&quot;)))?;
+        
+        // Write OS
+        writer.write_event(Event::Start(BytesStart::new(&quot;os&quot;)))?;
+        let os = std::env::consts::OS;
+        writer.write_event(Event::Text(BytesText::new(os)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;os&quot;)))?;
+        
+        // Write kernel version
+        writer.write_event(Event::Start(BytesStart::new(&quot;kernel&quot;)))?;
+        let kernel = std::env::consts::FAMILY;
+        writer.write_event(Event::Text(BytesText::new(kernel)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;kernel&quot;)))?;
+        
+        writer.write_event(Event::End(BytesEnd::new(&quot;system_info&quot;)))?;
+        
+        Ok(())
+    }
+    
+    /// Write a directory node to XML
+    fn write_directory&lt;W: Write&gt;(&amp;self, dir: &amp;DirectoryNode, writer: &amp;mut Writer&lt;W&gt;) -&gt; io::Result&lt;()&gt; {
+        let mut start_tag = BytesStart::new(&quot;directory&quot;);
+        start_tag.push_attribute((&quot;name&quot;, dir.name.as_str()));
+        start_tag.push_attribute((&quot;path&quot;, dir.path.to_string_lossy().as_ref()));
+        writer.write_event(Event::Start(start_tag))?;
+        
+        // Write metadata
+        self.write_metadata(&amp;dir.metadata, writer)?;
+        
+        // Write contents
+        writer.write_event(Event::Start(BytesStart::new(&quot;contents&quot;)))?;
+        
+        for node in &amp;dir.contents {
+            match node {
+                Node::Directory(dir_node) =&gt; self.write_directory(dir_node, writer)?,
+                Node::File(file_node) =&gt; self.write_file(file_node, writer)?,
+                Node::Binary(bin_node) =&gt; self.write_binary(bin_node, writer)?,
+                Node::Symlink(sym_node) =&gt; self.write_symlink(sym_node, writer)?,
+            }
+        }
+        
+        writer.write_event(Event::End(BytesEnd::new(&quot;contents&quot;)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;directory&quot;)))?;
+        
+        Ok(())
+    }
+    
+    /// Write a file node to XML
+    fn write_file&lt;W: Write&gt;(&amp;self, file: &amp;FileNode, writer: &amp;mut Writer&lt;W&gt;) -&gt; io::Result&lt;()&gt; {
+        let mut start_tag = BytesStart::new(&quot;file&quot;);
+        start_tag.push_attribute((&quot;name&quot;, file.name.as_str()));
+        start_tag.push_attribute((&quot;path&quot;, file.path.to_string_lossy().as_ref()));
+        writer.write_event(Event::Start(start_tag))?;
+        
+        // Write metadata
+        self.write_metadata(&amp;file.metadata, writer)?;
+        
+        // Write content
+        writer.write_event(Event::Start(BytesStart::new(&quot;content&quot;)))?;
+        if let Some(content) = &amp;file.content {
+            // Split content into chunks and write as text events to avoid XML parsing issues
+            for chunk in content.as_bytes().chunks(4096) {
+                if let Ok(text) = std::str::from_utf8(chunk) {
+                    writer.write_event(Event::Text(BytesText::new(text)))?;
+                }
+            }
+        }
+        writer.write_event(Event::End(BytesEnd::new(&quot;content&quot;)))?;
+        
+        writer.write_event(Event::End(BytesEnd::new(&quot;file&quot;)))?;
+        
+        Ok(())
+    }
+    
+    /// Write a binary file node to XML
+    fn write_binary&lt;W: Write&gt;(&amp;self, binary: &amp;BinaryNode, writer: &amp;mut Writer&lt;W&gt;) -&gt; io::Result&lt;()&gt; {
+        let mut start_tag = BytesStart::new(&quot;binary&quot;);
+        start_tag.push_attribute((&quot;name&quot;, binary.name.as_str()));
+        start_tag.push_attribute((&quot;path&quot;, binary.path.to_string_lossy().as_ref()));
+        writer.write_event(Event::Start(start_tag))?;
+        
+        // Write metadata
+        self.write_metadata(&amp;binary.metadata, writer)?;
+        
+        writer.write_event(Event::End(BytesEnd::new(&quot;binary&quot;)))?;
+        
+        Ok(())
+    }
+    
+    /// Write a symlink node to XML
+    fn write_symlink&lt;W: Write&gt;(&amp;self, symlink: &amp;SymlinkNode, writer: &amp;mut Writer&lt;W&gt;) -&gt; io::Result&lt;()&gt; {
+        let mut start_tag = BytesStart::new(&quot;symlink&quot;);
+        start_tag.push_attribute((&quot;name&quot;, symlink.name.as_str()));
+        start_tag.push_attribute((&quot;path&quot;, symlink.path.to_string_lossy().as_ref()));
+        writer.write_event(Event::Start(start_tag))?;
+        
+        // Write metadata
+        self.write_metadata(&amp;symlink.metadata, writer)?;
+        
+        // Write target
+        writer.write_event(Event::Start(BytesStart::new(&quot;target&quot;)))?;
+        writer.write_event(Event::Text(BytesText::new(&amp;symlink.target)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;target&quot;)))?;
+        
+        writer.write_event(Event::End(BytesEnd::new(&quot;symlink&quot;)))?;
+        
+        Ok(())
+    }
+    
+    /// Write metadata to XML
+    fn write_metadata&lt;W: Write&gt;(&amp;self, metadata: &amp;Metadata, writer: &amp;mut Writer&lt;W&gt;) -&gt; io::Result&lt;()&gt; {
+        writer.write_event(Event::Start(BytesStart::new(&quot;metadata&quot;)))?;
+        
+        // Write size
+        writer.write_event(Event::Start(BytesStart::new(&quot;size&quot;)))?;
+        writer.write_event(Event::Text(BytesText::new(&amp;metadata.size.to_string())))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;size&quot;)))?;
+        
+        // Write modified time
+        writer.write_event(Event::Start(BytesStart::new(&quot;modified&quot;)))?;
+        let modified = chrono::DateTime::&lt;chrono::Local&gt;::from(metadata.modified)
+            .to_rfc3339();
+        writer.write_event(Event::Text(BytesText::new(&amp;modified)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;modified&quot;)))?;
+        
+        // Write permissions
+        writer.write_event(Event::Start(BytesStart::new(&quot;permissions&quot;)))?;
+        writer.write_event(Event::Text(BytesText::new(&amp;metadata.permissions)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;permissions&quot;)))?;
+        
+        writer.write_event(Event::End(BytesEnd::new(&quot;metadata&quot;)))?;
+        
+        Ok(())
+    }
+}</content>
+          </file>
+          <file name="lib.rs" path="dumpfs/src/lib.rs">
+            <metadata>
+              <size>667</size>
+              <modified>2025-03-26T22:38:50.319660356+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * DumpFS - Generate XML representation of directory contents for LLM context
+ *
+ * This library creates structured XML representations of directory contents
+ * for use as context for Large Language Models.
+ */
+
+pub mod config;
+pub mod scanner;
+pub mod types;
+pub mod utils;
+pub mod writer;
+
+#[cfg(test)]
+mod tests;
+
+// Re-export main components for easier access
+pub use config::Config;
+pub use scanner::Scanner;
+pub use types::{Node, DirectoryNode, FileNode, BinaryNode, SymlinkNode, FileType, Metadata};
+pub use utils::{count_files, format_file_size};
+pub use writer::XmlWriter;
+
+/// Version of the library
+pub const VERSION: &amp;str = env!(&quot;CARGO_PKG_VERSION&quot;);
+</content>
+          </file>
+          <file name="tests.rs" path="dumpfs/src/tests.rs">
+            <metadata>
+              <size>9080</size>
+              <modified>2025-03-26T22:41:30.707717054+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Tests for DumpFS functionality
+ */
+
+#[cfg(test)]
+mod tests {
+    use std::fs::{self, File};
+    use std::io::{self, Write};
+    use std::path::Path;
+    use std::sync::Arc;
+    
+    use indicatif::ProgressBar;
+    use quick_xml::events::Event;
+    use quick_xml::Reader;
+    use tempfile::tempdir;
+    
+    use crate::config::Config;
+    use crate::scanner::Scanner;
+    use crate::writer::XmlWriter;
+
+    // Helper function to create a test directory structure
+    fn setup_test_directory() -&gt; io::Result&lt;tempfile::TempDir&gt; {
+        let temp_dir = tempdir()?;
+        
+        // Create a simple directory structure
+        fs::create_dir(temp_dir.path().join(&quot;dir1&quot;))?;
+        fs::create_dir(temp_dir.path().join(&quot;dir2&quot;))?;
+        fs::create_dir(temp_dir.path().join(&quot;dir1&quot;).join(&quot;subdir&quot;))?;
+        
+        // Create text files
+        let mut file1 = File::create(temp_dir.path().join(&quot;file1.txt&quot;))?;
+        writeln!(file1, &quot;This is a text file with content&quot;)?;
+        
+        let mut file2 = File::create(temp_dir.path().join(&quot;dir1&quot;).join(&quot;file2.txt&quot;))?;
+        writeln!(file2, &quot;This is another text file\nwith multiple lines&quot;)?;
+        
+        let mut file3 = File::create(temp_dir.path().join(&quot;dir1&quot;).join(&quot;subdir&quot;).join(&quot;file3.txt&quot;))?;
+        writeln!(file3, &quot;Nested file content&quot;)?;
+        
+        // Create files to be ignored
+        fs::create_dir(temp_dir.path().join(&quot;.git&quot;))?;
+        let mut git_file = File::create(temp_dir.path().join(&quot;.git&quot;).join(&quot;config&quot;))?;
+        writeln!(git_file, &quot;[core]\n\trepositoryformatversion = 0&quot;)?;
+        
+        // Create a binary file
+        let mut bin_file = File::create(temp_dir.path().join(&quot;binary.bin&quot;))?;
+        bin_file.write_all(&amp;[0u8, 1u8, 2u8, 3u8])?;
+        
+        // Create a symlink if not on Windows
+        #[cfg(not(target_os = &quot;windows&quot;))]
+        std::os::unix::fs::symlink(
+            temp_dir.path().join(&quot;file1.txt&quot;),
+            temp_dir.path().join(&quot;symlink.txt&quot;),
+        )?;
+        
+        Ok(temp_dir)
+    }
+
+    // Helper function to create a large file (&gt;1MB)
+    fn create_large_file(dir: &amp;Path) -&gt; io::Result&lt;()&gt; {
+        let path = dir.join(&quot;large_file.txt&quot;);
+        let mut file = File::create(path)?;
+        
+        // Write over 1MB of data
+        let line = &quot;This is a line of text that will be repeated many times to create a large file.\n&quot;;
+        for _ in 0..20000 {
+            file.write_all(line.as_bytes())?;
+        }
+        
+        Ok(())
+    }
+
+    // Test basic scanning functionality
+    #[test]
+    fn test_basic_scan() -&gt; io::Result&lt;()&gt; {
+        let temp_dir = setup_test_directory()?;
+        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+        
+        let config = Config {
+            target_dir: temp_dir.path().to_path_buf(),
+            output_file: output_file.clone(),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+        };
+        
+        let progress = Arc::new(ProgressBar::hidden());
+        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+        let writer = XmlWriter::new(config);
+        
+        let root_node = scanner.scan()?;
+        writer.write(&amp;root_node)?;
+        
+        // Check that the output file exists
+        assert!(output_file.exists());
+        
+        // Read the XML file to verify structure
+        let xml_content = fs::read_to_string(&amp;output_file)?;
+        
+        // Check basic structure
+        assert!(xml_content.contains(&quot;&lt;directory_scan&quot;));
+        assert!(xml_content.contains(&quot;&lt;system_info&gt;&quot;));
+        assert!(xml_content.contains(&quot;&lt;hostname&gt;&quot;));
+        assert!(xml_content.contains(&quot;&lt;directory name=&quot;));
+        assert!(xml_content.contains(&quot;&lt;file name=\&quot;file1.txt\&quot;&quot;));
+        assert!(xml_content.contains(&quot;This is a text file with content&quot;));
+        
+        // The .git directory should be ignored by default
+        assert!(!xml_content.contains(&quot;.git&quot;));
+        
+        Ok(())
+    }
+
+    // Test ignore patterns
+    #[test]
+    fn test_ignore_patterns() -&gt; io::Result&lt;()&gt; {
+        let temp_dir = setup_test_directory()?;
+        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+        
+        let config = Config {
+            target_dir: temp_dir.path().to_path_buf(),
+            output_file: output_file.clone(),
+            ignore_patterns: vec![&quot;*.txt&quot;.to_string()],
+            include_patterns: vec![],
+            num_threads: 1,
+        };
+        
+        let progress = Arc::new(ProgressBar::hidden());
+        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+        let writer = XmlWriter::new(config);
+        
+        let root_node = scanner.scan()?;
+        writer.write(&amp;root_node)?;
+        
+        // Read the XML file
+        let xml_content = fs::read_to_string(&amp;output_file)?;
+        
+        // All .txt files should be ignored
+        assert!(!xml_content.contains(&quot;file1.txt&quot;));
+        assert!(!xml_content.contains(&quot;file2.txt&quot;));
+        assert!(!xml_content.contains(&quot;file3.txt&quot;));
+        
+        // The binary file should still be included
+        assert!(xml_content.contains(&quot;binary.bin&quot;));
+        
+        Ok(())
+    }
+
+    // Test include patterns
+    #[test]
+    fn test_include_patterns() -&gt; io::Result&lt;()&gt; {
+        let temp_dir = setup_test_directory()?;
+        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+        
+        let config = Config {
+            target_dir: temp_dir.path().to_path_buf(),
+            output_file: output_file.clone(),
+            ignore_patterns: vec![],
+            include_patterns: vec![&quot;*.bin&quot;.to_string()],
+            num_threads: 1,
+        };
+        
+        let progress = Arc::new(ProgressBar::hidden());
+        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+        let writer = XmlWriter::new(config);
+        
+        let root_node = scanner.scan()?;
+        writer.write(&amp;root_node)?;
+        
+        // Read the XML file
+        let xml_content = fs::read_to_string(&amp;output_file)?;
+        
+        // Only .bin files should be included
+        assert!(!xml_content.contains(&quot;file1.txt&quot;));
+        assert!(!xml_content.contains(&quot;file2.txt&quot;));
+        assert!(!xml_content.contains(&quot;file3.txt&quot;));
+        assert!(xml_content.contains(&quot;binary.bin&quot;));
+        
+        Ok(())
+    }
+
+    // Test handling of large files
+    #[test]
+    fn test_large_file_handling() -&gt; io::Result&lt;()&gt; {
+        let temp_dir = setup_test_directory()?;
+        create_large_file(temp_dir.path())?;
+        
+        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+        
+        let config = Config {
+            target_dir: temp_dir.path().to_path_buf(),
+            output_file: output_file.clone(),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+        };
+        
+        let progress = Arc::new(ProgressBar::hidden());
+        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+        let writer = XmlWriter::new(config);
+        
+        let root_node = scanner.scan()?;
+        writer.write(&amp;root_node)?;
+        
+        // Read the XML file
+        let xml_content = fs::read_to_string(&amp;output_file)?;
+        
+        // Large file should be mentioned but content should be truncated
+        assert!(xml_content.contains(&quot;large_file.txt&quot;));
+        assert!(xml_content.contains(&quot;File too large to include content&quot;));
+        
+        Ok(())
+    }
+
+    // Test XML structure validity
+    #[test]
+    fn test_xml_validity() -&gt; io::Result&lt;()&gt; {
+        let temp_dir = setup_test_directory()?;
+        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+        
+        let config = Config {
+            target_dir: temp_dir.path().to_path_buf(),
+            output_file: output_file.clone(),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+        };
+        
+        let progress = Arc::new(ProgressBar::hidden());
+        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+        let writer = XmlWriter::new(config);
+        
+        let root_node = scanner.scan()?;
+        writer.write(&amp;root_node)?;
+        
+        // Parse the XML file to verify it&apos;s well-formed
+        let file_content = fs::read_to_string(&amp;output_file)?;
+        let mut reader = Reader::from_str(&amp;file_content);
+        // Note: trim_text method was removed in newer quick-xml versions
+        // reader.trim_text(true);
+        
+        let mut depth = 0;
+        let mut buf = Vec::new();
+        
+        loop {
+            match reader.read_event_into(&amp;mut buf) {
+                Ok(Event::Start(_)) =&gt; depth += 1,
+                Ok(Event::End(_)) =&gt; depth -= 1,
+                Ok(Event::Eof) =&gt; break,
+                Err(e) =&gt; panic!(&quot;Error parsing XML: {}&quot;, e),
+                _ =&gt; (),
+            }
+            buf.clear();
+        }
+        
+        // If XML is well-formed, depth should be 0 at the end
+        assert_eq!(depth, 0, &quot;XML structure is not well-balanced&quot;);
+        
+        Ok(())
+    }
+}
+</content>
+          </file>
+        </contents>
+      </directory>
+      <file name="Cargo.toml" path="dumpfs/Cargo.toml">
+        <metadata>
+          <size>507</size>
+          <modified>2025-03-26T22:33:10.219834277+03:00</modified>
+          <permissions>644</permissions>
+        </metadata>
+        <content>[package]
+name = &quot;dumpfs&quot;
+version = &quot;0.1.0&quot;
+edition = &quot;2021&quot;
+description = &quot;Generate XML representation of directory contents for LLM context&quot;
+authors = [&quot;DumpFS Team&quot;]
+license = &quot;MIT&quot;
+
+[dependencies]
+clap = { version = &quot;4.3&quot;, features = [&quot;derive&quot;] }
+walkdir = &quot;2.3&quot;
+quick-xml = &quot;0.37.3&quot;
+rayon = &quot;1.7&quot;
+indicatif = &quot;0.17&quot;
+glob-match = &quot;0.2&quot;
+chrono = &quot;0.4&quot;
+once_cell = &quot;1.18&quot;
+hostname = &quot;0.4.0&quot;
+
+[dev-dependencies]
+tempfile = &quot;3.8&quot;
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = &quot;abort&quot;
+strip = true
+</content>
+      </file>
+      <file name="README.md" path="dumpfs/README.md">
+        <metadata>
+          <size>2500</size>
+          <modified>2025-03-26T22:39:03.098666584+03:00</modified>
+          <permissions>644</permissions>
+        </metadata>
+        <content># DumpFS: Directory Context Generator for LLMs
+
+`dumpfs` is a command-line tool that generates an XML representation of directory contents, designed specifically for providing context to Large Language Models (LLMs) for coding tasks.
+
+## Features
+
+- Recursively scans directories and generates structured XML output
+- Includes file content with CDATA wrapping
+- Handles different file types (text, binary, symlinks)
+- Provides file metadata (size, modification time, permissions)
+- Supports pattern-based inclusion and exclusion of files
+- Parallel processing for better performance
+- Progress tracking with ETA
+
+## Installation
+
+### From Cargo
+
+```bash
+cargo install dumpfs
+```
+
+### From Source
+
+```bash
+git clone https://github.com/yourusername/dumpfs.git
+cd dumpfs
+cargo build --release
+```
+
+The binary will be available at `target/release/dumpfs`.
+
+## Usage
+
+```
+dumpfs [DIRECTORY_PATH] [OUTPUT_FILE] [OPTIONS]
+
+OPTIONS:
+    --ignore-patterns &lt;pattern1,pattern2,...&gt;    Comma-separated list of patterns to ignore
+    --include-patterns &lt;pattern1,pattern2,...&gt;   Comma-separated list of patterns to include
+    --threads &lt;N&gt;                               Number of threads to use for processing
+```
+
+### Examples
+
+```bash
+# Process current directory
+dumpfs
+
+# Process specific directory with custom output file
+dumpfs /path/to/project project_context.xml
+
+# Ignore specific patterns
+dumpfs --ignore-patterns &quot;*.log,*.tmp,*.bak&quot;
+
+# Include only specific patterns
+dumpfs --include-patterns &quot;*.rs,*.toml,*.md&quot;
+
+# Use 8 threads for processing
+dumpfs --threads 8
+```
+
+## Output Format
+
+The tool generates an XML file with the following structure:
+
+```xml
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;directory_scan timestamp=&quot;2025-03-26T12:34:56+00:00&quot;&gt;
+  &lt;system_info&gt;
+    &lt;hostname&gt;your-hostname&lt;/hostname&gt;
+    &lt;os&gt;linux&lt;/os&gt;
+    &lt;kernel&gt;unix&lt;/kernel&gt;
+  &lt;/system_info&gt;
+  &lt;directory name=&quot;project&quot; path=&quot;project&quot;&gt;
+    &lt;metadata&gt;
+      &lt;size&gt;4096&lt;/size&gt;
+      &lt;modified&gt;2025-03-26T12:34:56+00:00&lt;/modified&gt;
+      &lt;permissions&gt;755&lt;/permissions&gt;
+    &lt;/metadata&gt;
+    &lt;contents&gt;
+      &lt;file name=&quot;example.rs&quot; path=&quot;project/example.rs&quot;&gt;
+        &lt;metadata&gt;
+          &lt;size&gt;1024&lt;/size&gt;
+          &lt;modified&gt;2025-03-26T12:34:56+00:00&lt;/modified&gt;
+          &lt;permissions&gt;644&lt;/permissions&gt;
+        &lt;/metadata&gt;
+        &lt;content&gt;&lt;![CDATA[fn main() {
+    println!(&quot;Hello, world!&quot;);
+}]]&gt;&lt;/content&gt;
+      &lt;/file&gt;
+      &lt;!-- More files and directories --&gt;
+    &lt;/contents&gt;
+  &lt;/directory&gt;
+&lt;/directory_scan&gt;
+```
+
+## License
+
+MIT
+</content>
+      </file>
+    </contents>
+  </directory>
+</directory_scan>
