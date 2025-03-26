@@ -2,11 +2,12 @@
  * Directory and file scanning functionality
  */
 
+use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self, BufRead, BufReader, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use glob_match::glob_match;
 use ignore::{DirEntry as IgnoreDirEntry, WalkBuilder};
@@ -18,18 +19,44 @@ use crate::config::Config;
 use crate::types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
 use crate::utils::{format_file_size, DEFAULT_IGNORE};
 
+use crate::report::FileReportInfo;
+
+/// Scanner statistics
+#[derive(Debug, Clone, Default)]
+pub struct ScannerStatistics {
+    /// Number of files processed
+    pub files_processed: usize,
+    /// Total number of lines
+    pub total_lines: usize,
+    /// Total number of characters
+    pub total_chars: usize,
+    /// Details for each file
+    pub file_details: HashMap<String, FileReportInfo>,
+}
+
 /// Scanner for directory contents
 pub struct Scanner {
     /// Scanner configuration
     config: Config,
     /// Progress bar
     pub progress: Arc<ProgressBar>,
+    /// Scanner statistics
+    statistics: Arc<Mutex<ScannerStatistics>>,
 }
 
 impl Scanner {
     /// Create a new scanner
     pub fn new(config: Config, progress: Arc<ProgressBar>) -> Self {
-        Self { config, progress }
+        Self {
+            config,
+            progress,
+            statistics: Arc::new(Mutex::new(ScannerStatistics::default())),
+        }
+    }
+
+    /// Get scanner statistics
+    pub fn get_statistics(&self) -> ScannerStatistics {
+        self.statistics.lock().unwrap().clone()
     }
 
     /// Scan the target directory and return the directory tree
@@ -54,12 +81,12 @@ impl Scanner {
             // Use ignore crate's Walk to handle .gitignore patterns
             let mut walker = WalkBuilder::new(abs_path);
             walker.max_depth(Some(1)); // Limit depth to just the current directory
-            
+
             // Use custom gitignore file if specified
             if let Some(gitignore_path) = &self.config.gitignore_path {
                 walker.add_custom_ignore_filename(gitignore_path);
             }
-            
+
             // Get all entries using the ignore walker
             let entries: Vec<IgnoreDirEntry> = walker
                 .build()
@@ -68,12 +95,11 @@ impl Scanner {
                 .filter(|e| !self.should_ignore(e.path()))
                 .filter(|e| self.should_include(e.path()))
                 .collect();
-            
+
             // Split into directories and files
-            let (dirs, files): (Vec<_>, Vec<_>) = entries
-                .into_iter()
-                .partition(|e| e.path().is_dir());
-            
+            let (dirs, files): (Vec<_>, Vec<_>) =
+                entries.into_iter().partition(|e| e.path().is_dir());
+
             // Process directories first (sequential)
             for entry in dirs {
                 let entry_path = entry.path();
@@ -86,14 +112,12 @@ impl Scanner {
 
                 match self.scan_directory(entry_path, &new_rel_path) {
                     Ok(dir_node) => contents.push(Node::Directory(dir_node)),
-                    Err(e) => eprintln!(
-                        "Error processing directory {}: {}",
-                        entry_path.display(),
-                        e
-                    ),
+                    Err(e) => {
+                        eprintln!("Error processing directory {}: {}", entry_path.display(), e)
+                    }
                 }
             }
-            
+
             // Process files in parallel
             let file_nodes: Vec<Node> = files
                 .par_iter()
@@ -115,7 +139,7 @@ impl Scanner {
                     }
                 })
                 .collect();
-                
+
             contents.extend(file_nodes);
         } else {
             // Use traditional walkdir approach when not respecting .gitignore
@@ -183,13 +207,26 @@ impl Scanner {
     fn process_file(&self, abs_path: &Path, rel_path: &Path) -> io::Result<Node> {
         self.progress.inc(1);
 
-        let file_type = self.get_file_type(abs_path)?;
-        let metadata = self.get_metadata(abs_path)?;
+        // Update progress message to show current file
         let file_name = abs_path
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
+        // Update the progress message with the filename
+        // Truncate if too long to avoid display issues
+        let display_name = if file_name.len() > 40 {
+            format!("...{}", &file_name[file_name.len().saturating_sub(37)..])
+        } else {
+            file_name.clone()
+        };
+        self.progress
+            .set_message(format!("Current file: {}", display_name));
+
+        let file_type = self.get_file_type(abs_path)?;
+        let metadata = self.get_metadata(abs_path)?;
+        // Use the relative path for reporting
+        let file_path = rel_path.to_string_lossy().to_string();
 
         match file_type {
             FileType::TextFile => {
@@ -201,13 +238,37 @@ impl Scanner {
                     content,
                 }))
             }
-            FileType::BinaryFile => Ok(Node::Binary(BinaryNode {
-                name: file_name,
-                path: rel_path.to_path_buf(),
-                metadata,
-            })),
+            FileType::BinaryFile => {
+                // Update statistics for binary files
+                {
+                    let mut stats = self.statistics.lock().unwrap();
+                    stats.files_processed += 1;
+                    stats
+                        .file_details
+                        .insert(file_path, FileReportInfo { lines: 0, chars: 0 });
+                }
+
+                Ok(Node::Binary(BinaryNode {
+                    name: file_name,
+                    path: rel_path.to_path_buf(),
+                    metadata,
+                }))
+            }
             FileType::Symlink => {
                 let target = fs::read_link(abs_path)?.to_string_lossy().to_string();
+
+                // Update statistics for symlinks
+                {
+                    let mut stats = self.statistics.lock().unwrap();
+                    stats.files_processed += 1;
+                    stats.file_details.insert(
+                        file_path,
+                        FileReportInfo {
+                            lines: 0,
+                            chars: target.chars().count(),
+                        },
+                    );
+                }
 
                 Ok(Node::Symlink(SymlinkNode {
                     name: file_name,
@@ -289,7 +350,7 @@ impl Scanner {
                     buffer.truncate(bytes_read);
 
                     // Simple heuristic for text files: check for valid UTF-8 and high text-to-binary ratio
-                    if let Ok(_) = String::from_utf8(buffer.clone()) {
+                    if String::from_utf8(buffer.clone()).is_ok() {
                         // Count binary characters (0x00-0x08, 0x0E-0x1F)
                         let binary_count = buffer
                             .iter()
@@ -322,25 +383,72 @@ impl Scanner {
         })
     }
 
-    /// Read the content of a text file
+    /// Read the content of a text file and update statistics
     fn read_file_content(&self, path: &Path) -> io::Result<Option<String>> {
         let metadata = fs::metadata(path)?;
+        // Get the relative path from the full path
+        let file_path = path.to_string_lossy().to_string();
 
         // Skip large files
         if metadata.len() > 1_048_576 {
             // 1MB limit
-            return Ok(Some(format!(
+            let message = format!(
                 "File too large to include content. Size: {}",
                 format_file_size(metadata.len())
-            )));
+            );
+
+            // Still update statistics for skipped files
+            {
+                let mut stats = self.statistics.lock().unwrap();
+                stats.files_processed += 1;
+                stats
+                    .file_details
+                    .insert(file_path, FileReportInfo { lines: 0, chars: 0 });
+            }
+
+            return Ok(Some(message));
         }
 
         // Read file content
         let mut content = String::new();
         match File::open(path) {
-            Ok(mut file) => {
+            Ok(file) => {
+                let mut line_count = 0;
+                let mut char_count = 0;
+
+                // Count lines and chars
+                let reader = BufReader::new(&file);
+                for line in reader.lines() {
+                    match line {
+                        Ok(line) => {
+                            line_count += 1;
+                            char_count += line.chars().count();
+                            // Add newline char that's stripped by lines() iterator
+                            char_count += 1;
+                        }
+                        Err(_) => break,
+                    }
+                }
+
+                // Re-read file for content
+                let mut file = File::open(path)?;
                 if let Err(e) = file.read_to_string(&mut content) {
                     return Ok(Some(format!("Failed to read file content: {}", e)));
+                }
+
+                // Update statistics
+                {
+                    let mut stats = self.statistics.lock().unwrap();
+                    stats.files_processed += 1;
+                    stats.total_lines += line_count;
+                    stats.total_chars += char_count;
+                    stats.file_details.insert(
+                        file_path,
+                        FileReportInfo {
+                            lines: line_count,
+                            chars: char_count,
+                        },
+                    );
                 }
             }
             Err(e) => {

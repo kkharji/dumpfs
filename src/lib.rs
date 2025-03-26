@@ -6,6 +6,7 @@
  */
 
 pub mod config;
+pub mod report;
 pub mod scanner;
 pub mod types;
 pub mod utils;
@@ -16,8 +17,9 @@ mod tests;
 
 // Re-export main components for easier access
 pub use config::Config;
+pub use report::{FileReportInfo, ReportFormat, Reporter, ScanReport};
 pub use scanner::Scanner;
-pub use types::{Node, DirectoryNode, FileNode, BinaryNode, SymlinkNode, FileType, Metadata};
+pub use types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
 pub use utils::{count_files, format_file_size};
 pub use writer::XmlWriter;
 

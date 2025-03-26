@@ -22,12 +22,12 @@ pub fn count_files(dir: &Path, config: &Config) -> io::Result<u64> {
     if config.respect_gitignore {
         // Use ignore crate's Walk to handle .gitignore patterns
         let mut walker = WalkBuilder::new(dir);
-        
+
         // Custom gitignore file if specified
         if let Some(gitignore_path) = &config.gitignore_path {
             walker.add_custom_ignore_filename(gitignore_path);
         }
-        
+
         for entry in walker.build().filter_map(Result::ok) {
             if entry.file_type().map_or(false, |ft| ft.is_file())
                 && !scanner.should_ignore(entry.path())
