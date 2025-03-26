@@ -9,6 +9,7 @@
 - Handles different file types (text, binary, symlinks)
 - Provides file metadata (size, modification time, permissions)
 - Supports pattern-based inclusion and exclusion of files
+- Respects `.gitignore` files for intelligent filtering
 - Parallel processing for better performance
 - Progress tracking with ETA
 
@@ -38,7 +39,9 @@ dumpfs [DIRECTORY_PATH] [OUTPUT_FILE] [OPTIONS]
 OPTIONS:
     --ignore-patterns <pattern1,pattern2,...>    Comma-separated list of patterns to ignore
     --include-patterns <pattern1,pattern2,...>   Comma-separated list of patterns to include
-    --threads <N>                               Number of threads to use for processing
+    --threads <N>                                Number of threads to use for processing
+    --respect-gitignore <BOOL>                   Whether to respect .gitignore files (default: true)
+    --gitignore-path <PATH>                      Path to custom .gitignore file
 ```
 
 ### Examples
@@ -58,7 +61,19 @@ dumpfs --include-patterns "*.rs,*.toml,*.md"
 
 # Use 8 threads for processing
 dumpfs --threads 8
+
+# Disable .gitignore respect
+dumpfs --respect-gitignore false
+
+# Use custom gitignore file
+dumpfs --gitignore-path /path/to/custom/gitignore
 ```
+
+## GitIgnore Support
+
+By default, `dumpfs` respects `.gitignore` files in the project directory. This means that files and directories that would be ignored by Git are also ignored by `dumpfs`. This is useful for excluding build artifacts, dependencies, and other files that are not relevant to the codebase.
+
+You can disable this behavior with the `--respect-gitignore false` option, or specify a custom gitignore file with the `--gitignore-path` option.
 
 ## Output Format
 

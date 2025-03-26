@@ -34,6 +34,14 @@ fn main() -> io::Result<()> {
     
     println!("Scanning directory: {}", config.target_dir.display());
     
+    // Print .gitignore status
+    if config.respect_gitignore {
+        match &config.gitignore_path {
+            Some(path) => println!("Using custom gitignore file: {}", path.display()),
+            None => println!("Respecting .gitignore files in the project"),
+        }
+    }
+    
     // Count files for progress tracking
     let total_files = match count_files(&config.target_dir, &config) {
         Ok(count) => {

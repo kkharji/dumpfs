@@ -6,9 +6,10 @@ use std::fs::{self, File};
 use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc; // Import trait for permissions.mode()
+use std::sync::Arc;
 
 use glob_match::glob_match;
+use ignore::{DirEntry as IgnoreDirEntry, WalkBuilder};
 use indicatif::ProgressBar;
 use rayon::prelude::*;
 use walkdir::{DirEntry, WalkDir};
@@ -48,53 +49,123 @@ impl Scanner {
         let metadata = self.get_metadata(abs_path)?;
         let mut contents = Vec::new();
 
-        // Collect all entries first
-        let entries: Vec<DirEntry> = WalkDir::new(abs_path)
-            .max_depth(1)
-            .min_depth(1)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| !self.should_ignore(e.path()))
-            .filter(|e| self.should_include(e.path()))
-            .collect();
-
-        // Split into directories and files
-        let (dirs, files): (Vec<_>, Vec<_>) =
-            entries.into_iter().partition(|e| e.file_type().is_dir());
-
-        // Process directories first (sequential)
-        for entry in dirs {
-            let entry_name = entry.file_name().to_string_lossy().to_string();
-            let new_rel_path = rel_path.join(&entry_name);
-
-            match self.scan_directory(entry.path(), &new_rel_path) {
-                Ok(dir_node) => contents.push(Node::Directory(dir_node)),
-                Err(e) => eprintln!(
-                    "Error processing directory {}: {}",
-                    entry.path().display(),
-                    e
-                ),
+        // Determine which entries to process based on whether we're using gitignore
+        if self.config.respect_gitignore {
+            // Use ignore crate's Walk to handle .gitignore patterns
+            let mut walker = WalkBuilder::new(abs_path);
+            walker.max_depth(Some(1)); // Limit depth to just the current directory
+            
+            // Use custom gitignore file if specified
+            if let Some(gitignore_path) = &self.config.gitignore_path {
+                walker.add_custom_ignore_filename(gitignore_path);
             }
-        }
+            
+            // Get all entries using the ignore walker
+            let entries: Vec<IgnoreDirEntry> = walker
+                .build()
+                .filter_map(Result::ok)
+                .filter(|e| e.path() != abs_path) // Skip the root directory itself
+                .filter(|e| !self.should_ignore(e.path()))
+                .filter(|e| self.should_include(e.path()))
+                .collect();
+            
+            // Split into directories and files
+            let (dirs, files): (Vec<_>, Vec<_>) = entries
+                .into_iter()
+                .partition(|e| e.path().is_dir());
+            
+            // Process directories first (sequential)
+            for entry in dirs {
+                let entry_path = entry.path();
+                let entry_name = entry_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                let new_rel_path = rel_path.join(&entry_name);
 
-        // Process files in parallel
-        let file_nodes: Vec<Node> = files
-            .par_iter()
-            .filter_map(|entry| {
+                match self.scan_directory(entry_path, &new_rel_path) {
+                    Ok(dir_node) => contents.push(Node::Directory(dir_node)),
+                    Err(e) => eprintln!(
+                        "Error processing directory {}: {}",
+                        entry_path.display(),
+                        e
+                    ),
+                }
+            }
+            
+            // Process files in parallel
+            let file_nodes: Vec<Node> = files
+                .par_iter()
+                .filter_map(|entry| {
+                    let entry_path = entry.path();
+                    let entry_name = entry_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    let new_rel_path = rel_path.join(&entry_name);
+
+                    match self.process_file(entry_path, &new_rel_path) {
+                        Ok(node) => Some(node),
+                        Err(e) => {
+                            eprintln!("Error processing {}: {}", entry_path.display(), e);
+                            None
+                        }
+                    }
+                })
+                .collect();
+                
+            contents.extend(file_nodes);
+        } else {
+            // Use traditional walkdir approach when not respecting .gitignore
+            let entries: Vec<DirEntry> = WalkDir::new(abs_path)
+                .max_depth(1)
+                .min_depth(1)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|e| !self.should_ignore(e.path()))
+                .filter(|e| self.should_include(e.path()))
+                .collect();
+
+            // Split into directories and files
+            let (dirs, files): (Vec<_>, Vec<_>) =
+                entries.into_iter().partition(|e| e.file_type().is_dir());
+
+            // Process directories first (sequential)
+            for entry in dirs {
                 let entry_name = entry.file_name().to_string_lossy().to_string();
                 let new_rel_path = rel_path.join(&entry_name);
 
-                match self.process_file(entry.path(), &new_rel_path) {
-                    Ok(node) => Some(node),
-                    Err(e) => {
-                        eprintln!("Error processing {}: {}", entry.path().display(), e);
-                        None
-                    }
+                match self.scan_directory(entry.path(), &new_rel_path) {
+                    Ok(dir_node) => contents.push(Node::Directory(dir_node)),
+                    Err(e) => eprintln!(
+                        "Error processing directory {}: {}",
+                        entry.path().display(),
+                        e
+                    ),
                 }
-            })
-            .collect();
+            }
 
-        contents.extend(file_nodes);
+            // Process files in parallel
+            let file_nodes: Vec<Node> = files
+                .par_iter()
+                .filter_map(|entry| {
+                    let entry_name = entry.file_name().to_string_lossy().to_string();
+                    let new_rel_path = rel_path.join(&entry_name);
+
+                    match self.process_file(entry.path(), &new_rel_path) {
+                        Ok(node) => Some(node),
+                        Err(e) => {
+                            eprintln!("Error processing {}: {}", entry.path().display(), e);
+                            None
+                        }
+                    }
+                })
+                .collect();
+
+            contents.extend(file_nodes);
+        }
 
         Ok(DirectoryNode {
             name: abs_path

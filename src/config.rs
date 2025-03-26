@@ -35,6 +35,14 @@ pub struct Args {
     /// Number of threads to use for processing
     #[clap(long, default_value = "4")]
     pub threads: usize,
+    
+    /// Respect .gitignore files (default: true)
+    #[clap(long, default_value = "true")]
+    pub respect_gitignore: bool,
+    
+    /// Path to custom .gitignore file
+    #[clap(long)]
+    pub gitignore_path: Option<String>,
 }
 
 /// Application configuration
@@ -54,6 +62,12 @@ pub struct Config {
     
     /// Number of threads to use for processing
     pub num_threads: usize,
+    
+    /// Whether to respect .gitignore files
+    pub respect_gitignore: bool,
+    
+    /// Path to custom .gitignore file
+    pub gitignore_path: Option<PathBuf>,
 }
 
 impl Config {
@@ -65,6 +79,8 @@ impl Config {
             ignore_patterns: args.ignore_patterns,
             include_patterns: args.include_patterns,
             num_threads: args.threads,
+            respect_gitignore: args.respect_gitignore,
+            gitignore_path: args.gitignore_path.map(PathBuf::from),
         }
     }
 
@@ -84,6 +100,16 @@ impl Config {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("Output directory not found: {}", parent.display())
+                ));
+            }
+        }
+        
+        // Check if custom gitignore file exists
+        if let Some(path) = &self.gitignore_path {
+            if !path.exists() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("Custom .gitignore file not found: {}", path.display())
                 ));
             }
         }
