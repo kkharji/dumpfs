@@ -396,7 +396,10 @@ fn test_output_file_path_for_git_repo() {
             let output_path = PathBuf::from(input);
             if !output_path.is_absolute()
                 && (output_path.parent().is_none()
-                    || output_path.parent().unwrap() == Path::new(""))
+                    || output_path
+                        .parent()
+                        .expect("Parent should be Some if not None")
+                        == Path::new(""))
             {
                 config.output_file = repo.cache_path.join(output_path);
             }

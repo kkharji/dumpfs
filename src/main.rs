@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
+use dumpfs::error::{DumpFsError, Result};
+
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, CompleteEnv, Shell};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -43,17 +45,15 @@ fn process_path(
     path: &str,
     git_cache_policy: GitCachePolicy,
     progress: Option<&ProgressBar>,
-) -> io::Result<(PathBuf, Option<String>, Option<GitRepoInfo>)> {
+) -> Result<(PathBuf, Option<String>, Option<GitRepoInfo>)> {
     // If not a Git URL, just return the path as is
     if !git::is_git_url(path) {
         return Ok((PathBuf::from(path), None, None));
     }
 
     // Parse the Git URL
-    let repo_info = match git::parse_git_url(path) {
-        Ok(info) => info,
-        Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),
-    };
+    let repo_info = git::parse_git_url(path)
+        .map_err(|e| DumpFsError::InvalidArgument(format!("Invalid Git URL: {}", e)))?;
 
     // Create a progress reporter adapter
     struct ProgressBarAdapter<'a> {
@@ -89,9 +89,11 @@ fn process_path(
         None => {
             // Create a new progress bar if none is provided
             let new_bar = ProgressBar::new(100);
-            new_bar.set_style(ProgressStyle::default_bar()
-                .template("{spinner:.green} {prefix:.bold.cyan} {msg} [{bar:40.cyan/blue}] {percent}%")
-                .unwrap());
+            new_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} {prefix:.bold.cyan} {msg} [{bar:40.cyan/blue}] {percent}%")
+                    .map_err(|e| DumpFsError::Unexpected(format!("Failed to create progress bar style: {}", e)))?
+            );
 
             // Since this is a temporary variable, we'll just leak it to avoid ownership issues
             Box::leak(Box::new(new_bar))
@@ -117,20 +119,21 @@ fn process_path(
                 is_clone: true,
             };
 
-            match git::Repository::clone(repo_info.clone(), Some(&reporter)) {
+            let repo = match git::Repository::clone(repo_info.clone(), Some(&reporter)) {
                 Ok(repo) => {
                     progress_bar.finish_with_message(format!(
                         "Repository cloned: {}/{}",
                         repo_info.owner, repo_info.name
                     ));
-
-                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+                    repo
                 }
                 Err(e) => {
                     progress_bar.abandon_with_message(format!("Failed to clone repository: {}", e));
-                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                    return Err(DumpFsError::Git(e));
                 }
-            }
+            };
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
         }
 
         // Force clone even if exists
@@ -146,10 +149,7 @@ fn process_path(
             if let Err(e) = std::fs::remove_dir_all(&repo_info.cache_path) {
                 progress_bar
                     .abandon_with_message(format!("Failed to remove existing repository: {}", e));
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Failed to remove directory: {}", e),
-                ));
+                return Err(DumpFsError::Io(e));
             }
 
             // Clone the repository
@@ -165,20 +165,21 @@ fn process_path(
                 is_clone: true,
             };
 
-            match git::Repository::clone(repo_info.clone(), Some(&reporter)) {
+            let repo = match git::Repository::clone(repo_info.clone(), Some(&reporter)) {
                 Ok(repo) => {
                     progress_bar.finish_with_message(format!(
                         "Repository cloned: {}/{}",
                         repo_info.owner, repo_info.name
                     ));
-
-                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+                    repo
                 }
                 Err(e) => {
                     progress_bar.abandon_with_message(format!("Failed to clone repository: {}", e));
-                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                    return Err(DumpFsError::Git(e));
                 }
-            }
+            };
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
         }
 
         // Pull if exists
@@ -195,26 +196,25 @@ fn process_path(
                 is_clone: false,
             };
 
-            match git::Repository::open(repo_info.clone()) {
-                Ok(mut repo) => {
-                    if let Err(e) = repo.pull(Some(&reporter)) {
-                        progress_bar
-                            .abandon_with_message(format!("Failed to update repository: {}", e));
-                        return Err(io::Error::new(io::ErrorKind::Other, e.to_string()));
-                    }
-
-                    progress_bar.finish_with_message(format!(
-                        "Repository updated: {}/{}",
-                        repo_info.owner, repo_info.name
-                    ));
-
-                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
-                }
+            let mut repo = match git::Repository::open(repo_info.clone()) {
+                Ok(repo) => repo,
                 Err(e) => {
                     progress_bar.abandon_with_message(format!("Failed to open repository: {}", e));
-                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                    return Err(DumpFsError::Git(e));
                 }
+            };
+
+            if let Err(e) = repo.pull(Some(&reporter)) {
+                progress_bar.abandon_with_message(format!("Failed to update repository: {}", e));
+                return Err(DumpFsError::Git(e));
             }
+
+            progress_bar.finish_with_message(format!(
+                "Repository updated: {}/{}",
+                repo_info.owner, repo_info.name
+            ));
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
         }
 
         // Use cache without pulling
@@ -239,7 +239,7 @@ fn process_path(
     }
 }
 
-fn main() -> io::Result<()> {
+fn main() -> Result<()> {
     // Enable automatic shell completion
     CompleteEnv::with_factory(Args::command).complete();
 
@@ -267,16 +267,18 @@ fn main() -> io::Result<()> {
             }
             Err(e) => {
                 eprintln!("Error cleaning cache: {}", e);
-                return Err(e);
+                return Err(DumpFsError::Io(e));
             }
         }
     }
 
     // Create progress bar with advanced Unicode styling
     let progress = ProgressBar::new(0);
-    progress.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white} {pos}/{len} ({percent}%) ⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s")
-        .unwrap());
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white} {pos}/{len} ({percent}%) ⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s")
+            .map_err(|e| DumpFsError::Unexpected(format!("Failed to create progress style: {}", e)))?
+    );
     progress.enable_steady_tick(std::time::Duration::from_millis(100));
     progress.set_prefix("📊 Setup");
 
@@ -308,7 +310,11 @@ fn main() -> io::Result<()> {
         // Check if output file is a relative path with no directory component
         let output_path = PathBuf::from(&args.output_file);
         if !output_path.is_absolute()
-            && (output_path.parent().is_none() || output_path.parent().unwrap() == Path::new(""))
+            && (output_path.parent().is_none()
+                || output_path
+                    .parent()
+                    .expect("Parent should be Some if not None")
+                    == Path::new(""))
         {
             // Use the repository directory for the output file
             config.output_file = repo.cache_path.join(output_path);
@@ -375,7 +381,7 @@ fn main() -> io::Result<()> {
     progress.finish_and_clear();
 
     // Get scanner statistics
-    let scanner_stats = scanner.get_statistics();
+    let scanner_stats = scanner.get_statistics()?;
 
     // Prepare the scan report
     let scan_report = ScanReport {

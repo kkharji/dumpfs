@@ -175,7 +175,7 @@ mod tests {
         let result = tokenizer.count_tokens("Hello, world!");
         assert!(result.is_ok());
 
-        let count = result.unwrap();
+        let count = result.expect("Token count should be valid in test environment");
         assert_eq!(count.tokens, 42);
     }
 
@@ -236,12 +236,12 @@ mod tests {
         // First call should be a cache miss
         let (count1, cached1) = tokenizer.count_tokens("Hello, world!");
         assert_eq!(count1, 42);
-        assert_eq!(cached1, false);
+        assert!(!cached1);
 
         // Second call should be a cache hit
         let (count2, cached2) = tokenizer.count_tokens("Hello, world!");
         assert_eq!(count2, 42);
-        assert_eq!(cached2, true);
+        assert!(cached2);
     }
 
     #[test]
@@ -250,11 +250,12 @@ mod tests {
         // Only run this test if ANTHROPIC_API_KEY is set
         match env::var("ANTHROPIC_API_KEY") {
             Ok(api_key) if !api_key.is_empty() => {
-                let tokenizer = create_tokenizer(Model::Sonnet37, "test_dir").unwrap();
+                let tokenizer = create_tokenizer(Model::Sonnet37, "test_dir")
+                    .expect("Tokenizer creation should succeed when API key is set");
                 let result = tokenizer.count_tokens("Hello, Claude!");
 
                 assert!(result.is_ok());
-                let count = result.unwrap();
+                let count = result.expect("Token count should be valid with valid API key");
                 assert!(count.tokens > 0);
             }
             _ => {

@@ -16,16 +16,18 @@ static HTTP_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         r"^https?://(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org|.*)/[^/]+/[^/]+(?:\.git)?$",
     )
-    .unwrap()
+    .expect("HTTP URL regex pattern should be valid")
 });
 
 static SSH_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^git@(?:github\.com|gitlab\.com|bitbucket\.org|[^:]+):[^/]+/[^/]+(?:\.git)?$")
-        .unwrap()
+        .expect("SSH URL regex pattern should be valid")
 });
 
-static SSH_PARSE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^git@([^:]+):([^/]+)/([^/]+)(?:\.git)?$").unwrap());
+static SSH_PARSE_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^git@([^:]+):([^/]+)/([^/]+)(?:\.git)?$")
+        .expect("SSH parse regex pattern should be valid")
+});
 
 /// Git hosting platform types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,7 +92,7 @@ impl FromStr for GitRepoInfo {
 
                 // Get path without leading slash
                 let path = parsed_url.path();
-                let path = path.strip_prefix('/').unwrap_or(path);
+                let path = path.strip_prefix('/').unwrap_or(path); // Safe unwrap since we're providing a fallback
 
                 let path_segments: Vec<&str> = path.split('/').collect();
 
@@ -179,7 +181,7 @@ pub fn parse_git_url(url: &str) -> GitResult<GitRepoInfo> {
 
 /// Get the cache directory path for a repository
 pub fn get_cache_path(host: &GitHost, owner: &str, name: &str) -> PathBuf {
-    let mut cache_dir = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("~/.cache"));
+    let mut cache_dir = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("~/.cache")); // Safe unwrap with fallback
     cache_dir = cache_dir.join("dumpfs");
 
     match host {

@@ -111,9 +111,13 @@ impl Repository {
             .map_err(GitError::FetchError)?;
 
         // Get object to reset to
+        let branch_name = remote_branch.name().ok_or_else(|| {
+            GitError::FetchError(git2::Error::from_str("Failed to get branch name"))
+        })?;
+
         let obj = self
             .inner
-            .revparse_single(remote_branch.name().unwrap())
+            .revparse_single(branch_name)
             .map_err(GitError::FetchError)?;
 
         // Reset to remote branch

@@ -6,6 +6,7 @@
  */
 
 pub mod config;
+pub mod error;
 pub mod git;
 pub mod report;
 pub mod scanner;
@@ -19,6 +20,7 @@ mod tests;
 
 // Re-export main components for easier access
 pub use config::Config;
+pub use error::{DumpFsError, Result, ResultExt};
 pub use report::{FileReportInfo, ReportFormat, Reporter, ScanReport};
 pub use scanner::Scanner;
 pub use types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};

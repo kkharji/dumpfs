@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{self, BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -16,6 +16,7 @@ use rayon::prelude::*;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::config::Config;
+use crate::error::{DumpFsError, Result, ResultExt};
 use crate::types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
 use crate::utils::{format_file_size, DEFAULT_IGNORE};
 
@@ -128,8 +129,14 @@ impl Scanner {
     }
 
     /// Get scanner statistics
-    pub fn get_statistics(&self) -> ScannerStatistics {
-        let mut stats = self.statistics.lock().unwrap().clone();
+    pub fn get_statistics(&self) -> Result<ScannerStatistics> {
+        let mut stats = self
+            .statistics
+            .lock()
+            .map_err(|_| {
+                DumpFsError::Unexpected("Failed to acquire lock on statistics".to_string())
+            })?
+            .clone();
 
         // If we have a tokenizer, get cache stats from global counters
         if self.tokenizer.is_some() {
@@ -138,12 +145,17 @@ impl Scanner {
             stats.token_cache_misses = Some(cache_stats.misses);
         }
 
-        stats
+        Ok(stats)
     }
 
     /// Scan the target directory and return the directory tree
-    pub fn scan(&self) -> io::Result<DirectoryNode> {
-        let abs_path = fs::canonicalize(&self.config.target_dir)?;
+    pub fn scan(&self) -> Result<DirectoryNode> {
+        let abs_path = fs::canonicalize(&self.config.target_dir).with_context(|| {
+            format!(
+                "Failed to canonicalize path: {}",
+                self.config.target_dir.display()
+            )
+        })?;
 
         // Determine the base directory name and path
         let dir_name = if let Some(repo_info) = &self.config.git_repo {
@@ -153,7 +165,12 @@ impl Scanner {
             // For local directories, use the directory name
             abs_path
                 .file_name()
-                .unwrap_or_default()
+                .ok_or_else(|| {
+                    DumpFsError::PathNotFound(format!(
+                        "No file name in path: {}",
+                        abs_path.display()
+                    ))
+                })?
                 .to_string_lossy()
                 .to_string()
         };
@@ -165,8 +182,13 @@ impl Scanner {
     }
 
     /// Scan a directory and return its node representation
-    fn scan_directory(&self, abs_path: &Path, rel_path: &Path) -> io::Result<DirectoryNode> {
-        let metadata = self.get_metadata(abs_path)?;
+    fn scan_directory(&self, abs_path: &Path, rel_path: &Path) -> Result<DirectoryNode> {
+        let metadata = self.get_metadata(abs_path).with_context(|| {
+            format!(
+                "Failed to get metadata for directory: {}",
+                abs_path.display()
+            )
+        })?;
         let mut contents = Vec::new();
 
         // Determine which entries to process based on whether we're using gitignore
@@ -183,7 +205,7 @@ impl Scanner {
             // Get all entries using the ignore walker
             let entries: Vec<IgnoreDirEntry> = walker
                 .build()
-                .filter_map(Result::ok)
+                .filter_map(|entry_result| entry_result.ok()) // Use closure instead of Result::ok to resolve type issues
                 .filter(|e| e.path() != abs_path) // Skip the root directory itself
                 .filter(|e| !self.should_ignore(e.path()))
                 .filter(|e| self.should_include(e.path()))
@@ -205,7 +227,12 @@ impl Scanner {
                     // Otherwise, just join with the entry name
                     let entry_name = entry_path
                         .file_name()
-                        .unwrap_or_default()
+                        .ok_or_else(|| {
+                            DumpFsError::PathNotFound(format!(
+                                "No file name in path: {}",
+                                entry_path.display()
+                            ))
+                        })?
                         .to_string_lossy()
                         .to_string();
                     rel_path.join(&entry_name)
@@ -222,13 +249,15 @@ impl Scanner {
             // Process files in parallel
             let file_nodes: Vec<Node> = files
                 .par_iter()
-                .filter_map(|entry| {
+                .filter_map(|entry: &IgnoreDirEntry| {
                     let entry_path = entry.path();
-                    let entry_name = entry_path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
+                    let entry_name = match entry_path.file_name() {
+                        Some(name) => name.to_string_lossy().to_string(),
+                        None => {
+                            eprintln!("Error: No file name in path: {}", entry_path.display());
+                            return None;
+                        }
+                    };
                     let new_rel_path = rel_path.join(&entry_name);
 
                     match self.process_file(entry_path, &new_rel_path) {
@@ -248,7 +277,7 @@ impl Scanner {
                 .max_depth(1)
                 .min_depth(1)
                 .into_iter()
-                .filter_map(Result::ok)
+                .filter_map(|entry_result| entry_result.ok()) // Use closure instead of Result::ok to resolve type issues
                 .filter(|e| !self.should_ignore(e.path()))
                 .filter(|e| self.should_include(e.path()))
                 .collect();
@@ -275,7 +304,7 @@ impl Scanner {
             // Process files in parallel
             let file_nodes: Vec<Node> = files
                 .par_iter()
-                .filter_map(|entry| {
+                .filter_map(|entry: &DirEntry| {
                     let entry_name = entry.file_name().to_string_lossy().to_string();
                     let new_rel_path = rel_path.join(&entry_name);
 
@@ -292,12 +321,16 @@ impl Scanner {
             contents.extend(file_nodes);
         }
 
+        let name = abs_path
+            .file_name()
+            .ok_or_else(|| {
+                DumpFsError::PathNotFound(format!("No file name in path: {}", abs_path.display()))
+            })?
+            .to_string_lossy()
+            .to_string();
+
         Ok(DirectoryNode {
-            name: abs_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string(),
+            name,
             path: rel_path.to_path_buf(),
             metadata,
             contents,
@@ -305,13 +338,15 @@ impl Scanner {
     }
 
     /// Process a single file and return its node representation
-    fn process_file(&self, abs_path: &Path, rel_path: &Path) -> io::Result<Node> {
+    fn process_file(&self, abs_path: &Path, rel_path: &Path) -> Result<Node> {
         self.progress.inc(1);
 
         // Update progress message to show current file
         let file_name = abs_path
             .file_name()
-            .unwrap_or_default()
+            .ok_or_else(|| {
+                DumpFsError::PathNotFound(format!("No file name in path: {}", abs_path.display()))
+            })?
             .to_string_lossy()
             .to_string();
 
@@ -335,8 +370,12 @@ impl Scanner {
 
         self.progress.set_message(progress_message);
 
-        let file_type = self.get_file_type(abs_path)?;
-        let metadata = self.get_metadata(abs_path)?;
+        let file_type = self
+            .get_file_type(abs_path)
+            .with_context(|| format!("Failed to determine file type for {}", abs_path.display()))?;
+        let metadata = self
+            .get_metadata(abs_path)
+            .with_context(|| format!("Failed to get metadata for {}", abs_path.display()))?;
 
         // Use the normalized path for reporting
         let file_path = if let Some(repo_info) = &self.config.git_repo {
@@ -354,7 +393,9 @@ impl Scanner {
 
         match file_type {
             FileType::TextFile => {
-                let content = self.read_file_content(abs_path)?;
+                let content = self
+                    .read_file_content(abs_path)
+                    .with_context(|| format!("Failed to read content of {}", abs_path.display()))?;
                 Ok(Node::File(FileNode {
                     name: file_name,
                     path: rel_path.to_path_buf(),
@@ -365,7 +406,9 @@ impl Scanner {
             FileType::BinaryFile => {
                 // Update statistics for binary files
                 {
-                    let mut stats = self.statistics.lock().unwrap();
+                    let mut stats = self.statistics.lock().map_err(|_| {
+                        DumpFsError::Unexpected("Failed to acquire lock on statistics".to_string())
+                    })?;
                     stats.files_processed += 1;
                     stats.file_details.insert(
                         file_path,
@@ -384,11 +427,18 @@ impl Scanner {
                 }))
             }
             FileType::Symlink => {
-                let target = fs::read_link(abs_path)?.to_string_lossy().to_string();
+                let target = fs::read_link(abs_path)
+                    .with_context(|| {
+                        format!("Failed to read symlink target for {}", abs_path.display())
+                    })?
+                    .to_string_lossy()
+                    .to_string();
 
                 // Update statistics for symlinks
                 {
-                    let mut stats = self.statistics.lock().unwrap();
+                    let mut stats = self.statistics.lock().map_err(|_| {
+                        DumpFsError::Unexpected("Failed to acquire lock on statistics".to_string())
+                    })?;
                     stats.files_processed += 1;
                     stats.file_details.insert(
                         file_path,
@@ -407,16 +457,19 @@ impl Scanner {
                     target,
                 }))
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Unexpected file type for {}", abs_path.display()),
-            )),
+            _ => Err(DumpFsError::Unexpected(format!(
+                "Unexpected file type for {}",
+                abs_path.display()
+            ))),
         }
     }
 
     /// Check if a file should be ignored based on patterns and defaults
     pub fn should_ignore(&self, path: &Path) -> bool {
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+        let file_name = match path.file_name() {
+            Some(name) => name.to_string_lossy(),
+            None => return true, // If there's no filename, ignore it
+        };
 
         // Check custom ignore patterns
         for pattern in &self.config.ignore_patterns {
@@ -445,7 +498,10 @@ impl Scanner {
             return true;
         }
 
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+        let file_name = match path.file_name() {
+            Some(name) => name.to_string_lossy(),
+            None => return false, // If there's no filename, don't include it
+        };
 
         // Check against include patterns
         for pattern in &self.config.include_patterns {
@@ -458,8 +514,13 @@ impl Scanner {
     }
 
     /// Determine the type of a file
-    fn get_file_type(&self, path: &Path) -> io::Result<FileType> {
-        let metadata = fs::metadata(path)?;
+    fn get_file_type(&self, path: &Path) -> Result<FileType> {
+        let metadata = fs::metadata(path).with_context(|| {
+            format!(
+                "Failed to get metadata for file type detection: {}",
+                path.display()
+            )
+        })?;
 
         if metadata.is_dir() {
             return Ok(FileType::Directory);
@@ -475,8 +536,15 @@ impl Scanner {
                 // Read a sample of the file to determine type
                 let mut buffer = vec![0; std::cmp::min(8192, metadata.len() as usize)];
                 if !buffer.is_empty() {
-                    let mut file = File::open(path)?;
-                    let bytes_read = file.read(&mut buffer)?;
+                    let mut file = File::open(path).with_context(|| {
+                        format!("Failed to open file for type detection: {}", path.display())
+                    })?;
+                    let bytes_read = file.read(&mut buffer).with_context(|| {
+                        format!(
+                            "Failed to read from file for type detection: {}",
+                            path.display()
+                        )
+                    })?;
                     buffer.truncate(bytes_read);
 
                     // Simple heuristic for text files: check for valid UTF-8 and high text-to-binary ratio
@@ -503,19 +571,29 @@ impl Scanner {
     }
 
     /// Extract metadata from a file
-    fn get_metadata(&self, path: &Path) -> io::Result<Metadata> {
-        let fs_metadata = fs::metadata(path)?;
+    fn get_metadata(&self, path: &Path) -> Result<Metadata> {
+        let fs_metadata = fs::metadata(path)
+            .with_context(|| format!("Failed to get file metadata for {}", path.display()))?;
+
+        let modified = fs_metadata
+            .modified()
+            .with_context(|| format!("Failed to get modified time for {}", path.display()))?;
 
         Ok(Metadata {
             size: fs_metadata.len(),
-            modified: fs_metadata.modified()?,
+            modified,
             permissions: format!("{:o}", fs_metadata.permissions().mode() & 0o777),
         })
     }
 
     /// Read the content of a text file and update statistics
-    fn read_file_content(&self, path: &Path) -> io::Result<Option<String>> {
-        let metadata = fs::metadata(path)?;
+    fn read_file_content(&self, path: &Path) -> Result<Option<String>> {
+        let metadata = fs::metadata(path).with_context(|| {
+            format!(
+                "Failed to get metadata for file content: {}",
+                path.display()
+            )
+        })?;
         // Get the normalized path for reporting
         let file_path = self.get_normalized_path_for_reporting(path);
 
@@ -529,7 +607,9 @@ impl Scanner {
 
             // Still update statistics for skipped files
             {
-                let mut stats = self.statistics.lock().unwrap();
+                let mut stats = self.statistics.lock().map_err(|_| {
+                    DumpFsError::Unexpected("Failed to acquire lock on statistics".to_string())
+                })?;
                 stats.files_processed += 1;
                 stats.file_details.insert(
                     file_path,
@@ -566,9 +646,12 @@ impl Scanner {
                 }
 
                 // Re-read file for content
-                let mut file = File::open(path)?;
-                if let Err(e) = file.read_to_string(&mut content) {
-                    return Ok(Some(format!("Failed to read file content: {}", e)));
+                let mut file = File::open(path).with_context(|| {
+                    format!("Failed to re-open file for content: {}", path.display())
+                })?;
+                match file.read_to_string(&mut content) {
+                    Ok(_) => {}
+                    Err(e) => return Ok(Some(format!("Failed to read file content: {}", e))),
                 }
 
                 // Count tokens if tokenizer is enabled
@@ -586,7 +669,9 @@ impl Scanner {
 
                 // Update statistics
                 {
-                    let mut stats = self.statistics.lock().unwrap();
+                    let mut stats = self.statistics.lock().map_err(|_| {
+                        DumpFsError::Unexpected("Failed to acquire lock on statistics".to_string())
+                    })?;
                     stats.files_processed += 1;
                     stats.total_lines += line_count;
                     stats.total_chars += char_count;
