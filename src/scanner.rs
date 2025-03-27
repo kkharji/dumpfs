@@ -20,7 +20,7 @@ use crate::types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node
 use crate::utils::{format_file_size, DEFAULT_IGNORE};
 
 use crate::report::FileReportInfo;
-use crate::tokenizer::{create_tokenizer, Tokenizer};
+use crate::tokenizer::{create_tokenizer, get_global_cache_stats, Tokenizer};
 
 /// Scanner statistics
 #[derive(Debug, Clone, Default)]
@@ -133,9 +133,9 @@ impl Scanner {
 
         // If we have a tokenizer, get cache stats from global counters
         if self.tokenizer.is_some() {
-            let (hits, misses) = crate::tokenizer::CachedTokenizer::get_global_cache_stats();
-            stats.token_cache_hits = Some(hits);
-            stats.token_cache_misses = Some(misses);
+            let cache_stats = get_global_cache_stats();
+            stats.token_cache_hits = Some(cache_stats.hits);
+            stats.token_cache_misses = Some(cache_stats.misses);
         }
 
         stats

@@ -1,169 +1,4564 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<directory_scan timestamp="2025-03-27T19:32:01.412004197+03:00">
+<directory_scan timestamp="2025-03-27T22:49:42.939302489+03:00">
   <system_info>
     <hostname>penzu</hostname>
     <os>linux</os>
     <kernel>unix</kernel>
-    <git_repository>
-      <url>https://github.com/zed-extensions/postgres-context-server</url>
-      <host>github.com</host>
-      <owner>zed-extensions</owner>
-      <name>postgres-context-server</name>
-    </git_repository>
   </system_info>
-  <directory name="postgres-context-server" path="postgres-context-server">
+  <directory name="dumpfs" path="dumpfs">
     <metadata>
-      <size>120</size>
-      <modified>2025-03-27T19:23:53.127316377+03:00</modified>
+      <size>154</size>
+      <modified>2025-03-27T21:34:36.010944886+03:00</modified>
       <permissions>755</permissions>
     </metadata>
     <contents>
-      <directory name="src" path="postgres-context-server/src">
+      <directory name="src" path="/home/user/projs/dumpfs/src">
         <metadata>
-          <size>50</size>
-          <modified>2025-03-27T19:23:53.127316377+03:00</modified>
+          <size>172</size>
+          <modified>2025-03-27T22:40:39.226377383+03:00</modified>
           <permissions>755</permissions>
         </metadata>
         <contents>
-          <file name="postgres_model_context.rs" path="postgres-context-server/src/postgres_model_context.rs">
+          <directory name="git" path="/home/user/projs/dumpfs/src/git">
             <metadata>
-              <size>1774</size>
-              <modified>2025-03-27T19:23:53.127316377+03:00</modified>
-              <permissions>644</permissions>
+              <size>104</size>
+              <modified>2025-03-27T22:07:09.433112497+03:00</modified>
+              <permissions>755</permissions>
             </metadata>
-            <content>use serde::Deserialize;
-use std::env;
-use zed::settings::ContextServerSettings;
-use zed_extension_api::{self as zed, serde_json, Command, ContextServerId, Project, Result};
+            <contents>
+              <file name="error.rs" path="/home/user/projs/dumpfs/src/git/error.rs">
+                <metadata>
+                  <size>989</size>
+                  <modified>2025-03-27T22:14:42.601872085+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>/*!
+ * Error types for Git operations
+ */
 
-const PACKAGE_NAME: &amp;str = &quot;@zeddotdev/postgres-context-server&quot;;
-const PACKAGE_VERSION: &amp;str = &quot;0.1.2&quot;;
-const SERVER_PATH: &amp;str = &quot;node_modules/@zeddotdev/postgres-context-server/index.mjs&quot;;
+use thiserror::Error;
 
-struct PostgresModelContextExtension;
+/// Errors that can occur during Git operations
+#[derive(Error, Debug)]
+pub enum GitError {
+    /// Invalid Git URL format
+    #[error(&quot;Invalid Git URL: {0}&quot;)]
+    InvalidUrl(String),
 
-#[derive(Debug, Deserialize)]
-struct PostgresContextServerSettings {
-    database_url: String,
+    /// Error opening a Git repository
+    #[error(&quot;Failed to open repository: {0}&quot;)]
+    OpenError(git2::Error),
+
+    /// Error cloning a Git repository
+    #[error(&quot;Failed to clone repository: {0}&quot;)]
+    CloneError(git2::Error),
+
+    /// Error fetching from remote
+    #[error(&quot;Failed to fetch from remote: {0}&quot;)]
+    FetchError(git2::Error),
+
+    /// Git2 error (generic)
+    #[error(&quot;Git error: {0}&quot;)]
+    Git2Error(#[from] git2::Error),
+
+    /// IO error during Git operations
+    #[error(&quot;IO error: {0}&quot;)]
+    IoError(#[from] std::io::Error),
+
+    /// Repository not found
+    #[error(&quot;Repository not found: {0}&quot;)]
+    NotFound(String),
 }
 
-impl zed::Extension for PostgresModelContextExtension {
-    fn new() -&gt; Self {
-        Self
-    }
+/// Specialized Result type for Git operations
+pub type GitResult&lt;T&gt; = Result&lt;T, GitError&gt;;
+</content>
+              </file>
+              <file name="progress.rs" path="/home/user/projs/dumpfs/src/git/progress.rs">
+                <metadata>
+                  <size>1407</size>
+                  <modified>2025-03-27T22:14:42.602872083+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>/*!
+ * Progress reporting for Git operations
+ */
 
-    fn context_server_command(
-        &amp;mut self,
-        _context_server_id: &amp;ContextServerId,
-        project: &amp;Project,
-    ) -&gt; Result&lt;Command&gt; {
-        let version = zed::npm_package_installed_version(PACKAGE_NAME)?;
-        if version.as_deref() != Some(PACKAGE_VERSION) {
-            zed::npm_install_package(PACKAGE_NAME, PACKAGE_VERSION)?;
+use crate::utils::format_file_size;
+
+/// Trait for reporting Git operation progress
+pub trait ProgressReporter {
+    /// Called with progress information during Git operations
+    fn report(&amp;self, progress: &amp;GitProgress);
+}
+
+/// Progress information for Git operations
+#[derive(Debug, Clone)]
+pub struct GitProgress {
+    /// Total number of objects to download
+    pub total_objects: usize,
+    /// Number of received objects
+    pub received_objects: usize,
+    /// Number of indexed objects
+    pub indexed_objects: usize,
+    /// Number of local objects
+    pub local_objects: usize,
+    /// Total number of deltas
+    pub total_deltas: usize,
+    /// Number of indexed deltas
+    pub indexed_deltas: usize,
+    /// Number of bytes received
+    pub received_bytes: usize,
+}
+
+impl GitProgress {
+    /// Get the progress percentage
+    pub fn percentage(&amp;self) -&gt; u8 {
+        if self.total_objects == 0 {
+            return 0;
         }
 
-        let settings = ContextServerSettings::for_project(&quot;postgres-context-server&quot;, project)?;
-        let Some(settings) = settings.settings else {
-            return Err(&quot;missing `database_url` setting&quot;.into());
-        };
-        let settings: PostgresContextServerSettings =
-            serde_json::from_value(settings).map_err(|e| e.to_string())?;
+        ((self.received_objects * 100) / self.total_objects) as u8
+    }
 
-        Ok(Command {
-            command: &quot;node&quot;.to_string(),
-            args: vec![
-                env::current_dir()
-                    .unwrap()
-                    .join(SERVER_PATH)
-                    .to_string_lossy()
-                    .to_string(),
-            ],
-            env: vec![
-                (&quot;DATABASE_URL&quot;.into(), settings.database_url)
-            ],
+    /// Get a formatted string of received bytes
+    pub fn formatted_bytes(&amp;self) -&gt; String {
+        format_file_size(self.received_bytes as u64)
+    }
+}
+
+// Implement ProgressReporter for closures
+impl&lt;F&gt; ProgressReporter for F
+where
+    F: Fn(&amp;GitProgress),
+{
+    fn report(&amp;self, progress: &amp;GitProgress) {
+        self(progress)
+    }
+}
+</content>
+              </file>
+              <file name="url.rs" path="/home/user/projs/dumpfs/src/git/url.rs">
+                <metadata>
+                  <size>9060</size>
+                  <modified>2025-03-27T22:14:42.605872078+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>/*!
+ * Git URL parsing and handling
+ */
+
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use once_cell::sync::Lazy;
+use regex::Regex;
+use url::Url;
+
+use super::error::{GitError, GitResult};
+
+// Statically compiled regexes for better performance
+static HTTP_REGEX: Lazy&lt;Regex&gt; = Lazy::new(|| {
+    Regex::new(
+        r&quot;^https?://(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org|.*)/[^/]+/[^/]+(?:\.git)?$&quot;,
+    )
+    .unwrap()
+});
+
+static SSH_REGEX: Lazy&lt;Regex&gt; = Lazy::new(|| {
+    Regex::new(r&quot;^git@(?:github\.com|gitlab\.com|bitbucket\.org|[^:]+):[^/]+/[^/]+(?:\.git)?$&quot;)
+        .unwrap()
+});
+
+static SSH_PARSE_REGEX: Lazy&lt;Regex&gt; =
+    Lazy::new(|| Regex::new(r&quot;^git@([^:]+):([^/]+)/([^/]+)(?:\.git)?$&quot;).unwrap());
+
+/// Git hosting platform types
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GitHost {
+    /// GitHub repository
+    GitHub,
+    /// GitLab repository
+    GitLab,
+    /// Bitbucket repository
+    Bitbucket,
+    /// Other Git hosting
+    Other(String),
+}
+
+impl std::fmt::Display for GitHost {
+    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;&apos;_&gt;) -&gt; std::fmt::Result {
+        match self {
+            GitHost::GitHub =&gt; write!(f, &quot;GitHub&quot;),
+            GitHost::GitLab =&gt; write!(f, &quot;GitLab&quot;),
+            GitHost::Bitbucket =&gt; write!(f, &quot;Bitbucket&quot;),
+            GitHost::Other(host) =&gt; write!(f, &quot;{}&quot;, host),
+        }
+    }
+}
+
+/// Information about a Git repository
+#[derive(Debug, Clone)]
+pub struct GitRepoInfo {
+    /// Original URL
+    pub url: String,
+    /// Git hosting platform
+    pub host: GitHost,
+    /// Repository owner/username
+    pub owner: String,
+    /// Repository name
+    pub name: String,
+    /// Local cache path
+    pub cache_path: PathBuf,
+}
+
+impl std::fmt::Display for GitRepoInfo {
+    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;&apos;_&gt;) -&gt; std::fmt::Result {
+        write!(f, &quot;{}/{}/{}&quot;, self.host, self.owner, self.name)
+    }
+}
+
+impl FromStr for GitRepoInfo {
+    type Err = GitError;
+
+    fn from_str(url: &amp;str) -&gt; Result&lt;Self, Self::Err&gt; {
+        // Check if the URL is valid
+        if !HTTP_REGEX.is_match(url) &amp;&amp; !SSH_REGEX.is_match(url) {
+            return Err(GitError::InvalidUrl(url.to_string()));
+        }
+
+        // Handle HTTP/HTTPS URLs
+        if url.starts_with(&quot;http://&quot;) || url.starts_with(&quot;https://&quot;) {
+            if let Ok(parsed_url) = Url::parse(url) {
+                let host_str = parsed_url
+                    .host_str()
+                    .ok_or_else(|| GitError::InvalidUrl(format!(&quot;Invalid host in URL: {}&quot;, url)))?;
+
+                // Get path without leading slash
+                let path = parsed_url.path();
+                let path = path.strip_prefix(&apos;/&apos;).unwrap_or(path);
+
+                let path_segments: Vec&lt;&amp;str&gt; = path.split(&apos;/&apos;).collect();
+
+                if path_segments.len() &lt; 2 {
+                    return Err(GitError::InvalidUrl(format!(
+                        &quot;Missing owner or repository in URL: {}&quot;,
+                        url
+                    )));
+                }
+
+                let owner = path_segments[0].to_string();
+                let mut name = path_segments[1].to_string();
+
+                // Remove .git suffix if present
+                if name.ends_with(&quot;.git&quot;) {
+                    name = name[0..name.len() - 4].to_string();
+                }
+
+                let host = match host_str {
+                    &quot;github.com&quot; =&gt; GitHost::GitHub,
+                    &quot;gitlab.com&quot; =&gt; GitHost::GitLab,
+                    &quot;bitbucket.org&quot; =&gt; GitHost::Bitbucket,
+                    _ =&gt; GitHost::Other(host_str.to_string()),
+                };
+
+                let cache_path = get_cache_path(&amp;host, &amp;owner, &amp;name);
+
+                return Ok(GitRepoInfo {
+                    url: url.to_string(),
+                    host,
+                    owner,
+                    name,
+                    cache_path,
+                });
+            }
+        }
+
+        // Handle SSH URLs (git@github.com:owner/repo.git)
+        if url.starts_with(&quot;git@&quot;) {
+            if let Some(captures) = SSH_PARSE_REGEX.captures(url) {
+                if let (Some(host_match), Some(owner_match), Some(name_match)) =
+                    (captures.get(1), captures.get(2), captures.get(3))
+                {
+                    let host_str = host_match.as_str();
+                    let owner = owner_match.as_str().to_string();
+                    let mut name = name_match.as_str().to_string();
+
+                    // Remove .git suffix if present
+                    if name.ends_with(&quot;.git&quot;) {
+                        name = name[0..name.len() - 4].to_string();
+                    }
+
+                    let host = match host_str {
+                        &quot;github.com&quot; =&gt; GitHost::GitHub,
+                        &quot;gitlab.com&quot; =&gt; GitHost::GitLab,
+                        &quot;bitbucket.org&quot; =&gt; GitHost::Bitbucket,
+                        _ =&gt; GitHost::Other(host_str.to_string()),
+                    };
+
+                    let cache_path = get_cache_path(&amp;host, &amp;owner, &amp;name);
+
+                    return Ok(GitRepoInfo {
+                        url: url.to_string(),
+                        host,
+                        owner,
+                        name,
+                        cache_path,
+                    });
+                }
+            }
+        }
+
+        Err(GitError::InvalidUrl(url.to_string()))
+    }
+}
+
+/// Check if a path is a Git repository URL
+pub fn is_git_url(path: &amp;str) -&gt; bool {
+    path.parse::&lt;GitRepoInfo&gt;().is_ok()
+}
+
+/// Parse a Git repository URL into components
+pub fn parse_git_url(url: &amp;str) -&gt; GitResult&lt;GitRepoInfo&gt; {
+    url.parse()
+}
+
+/// Get the cache directory path for a repository
+pub fn get_cache_path(host: &amp;GitHost, owner: &amp;str, name: &amp;str) -&gt; PathBuf {
+    let mut cache_dir = dirs::cache_dir().unwrap_or_else(|| PathBuf::from(&quot;~/.cache&quot;));
+    cache_dir = cache_dir.join(&quot;dumpfs&quot;);
+
+    match host {
+        GitHost::GitHub =&gt; cache_dir.join(&quot;github&quot;).join(owner).join(name),
+        GitHost::GitLab =&gt; cache_dir.join(&quot;gitlab&quot;).join(owner).join(name),
+        GitHost::Bitbucket =&gt; cache_dir.join(&quot;bitbucket&quot;).join(owner).join(name),
+        GitHost::Other(host_name) =&gt; cache_dir.join(&quot;git&quot;).join(host_name).join(owner).join(name),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_git_url() {
+        // Test GitHub URLs
+        assert!(is_git_url(&amp;&quot;https://github.com/username/repo&quot;.to_string()));
+        assert!(is_git_url(
+            &amp;&quot;https://github.com/username/repo.git&quot;.to_string()
+        ));
+        assert!(is_git_url(&amp;&quot;git@github.com:username/repo.git&quot;.to_string()));
+
+        // Test GitLab URLs
+        assert!(is_git_url(&amp;&quot;https://gitlab.com/username/repo&quot;.to_string()));
+        assert!(is_git_url(
+            &amp;&quot;https://gitlab.com/username/repo.git&quot;.to_string()
+        ));
+        assert!(is_git_url(&amp;&quot;git@gitlab.com:username/repo.git&quot;.to_string()));
+
+        // Test Bitbucket URLs
+        assert!(is_git_url(
+            &amp;&quot;https://bitbucket.org/username/repo&quot;.to_string()
+        ));
+        assert!(is_git_url(
+            &amp;&quot;https://bitbucket.org/username/repo.git&quot;.to_string()
+        ));
+        assert!(is_git_url(
+            &amp;&quot;git@bitbucket.org:username/repo.git&quot;.to_string()
+        ));
+
+        // Test custom Git host URLs
+        assert!(is_git_url(
+            &amp;&quot;https://git.example.com/username/repo&quot;.to_string()
+        ));
+        assert!(is_git_url(
+            &amp;&quot;https://git.example.com/username/repo.git&quot;.to_string()
+        ));
+        assert!(is_git_url(
+            &amp;&quot;git@git.example.com:username/repo.git&quot;.to_string()
+        ));
+
+        // Test invalid URLs
+        assert!(!is_git_url(&amp;&quot;https://github.com&quot;.to_string()));
+        assert!(!is_git_url(&amp;&quot;https://github.com/username&quot;.to_string()));
+        assert!(!is_git_url(&amp;&quot;git@github.com&quot;.to_string()));
+        assert!(!is_git_url(&amp;&quot;/path/to/local/directory&quot;.to_string()));
+        assert!(!is_git_url(&amp;&quot;username/repo&quot;.to_string()));
+    }
+
+    #[test]
+    fn test_parse_git_url() {
+        // Test GitHub HTTPS URL
+        let repo = parse_git_url(&amp;&quot;https://github.com/username/repo&quot;.to_string()).unwrap();
+        assert_eq!(repo.url, &quot;https://github.com/username/repo&quot;);
+        assert!(matches!(repo.host, GitHost::GitHub));
+        assert_eq!(repo.owner, &quot;username&quot;);
+        assert_eq!(repo.name, &quot;repo&quot;);
+
+        // Test GitHub SSH URL
+        let repo = parse_git_url(&amp;&quot;git@github.com:username/repo.git&quot;.to_string()).unwrap();
+        assert_eq!(repo.url, &quot;git@github.com:username/repo.git&quot;);
+        assert!(matches!(repo.host, GitHost::GitHub));
+        assert_eq!(repo.owner, &quot;username&quot;);
+        assert_eq!(repo.name, &quot;repo&quot;);
+
+        // Test custom host cache path
+        let host = GitHost::Other(&quot;example.com&quot;.to_string());
+        let owner = &quot;username&quot;;
+        let name = &quot;repo&quot;;
+        let cache_path = get_cache_path(&amp;host, owner, name);
+        assert!(cache_path.ends_with(
+            &amp;std::path::Path::new(&quot;git&quot;)
+                .join(&quot;example.com&quot;)
+                .join(&quot;username&quot;)
+                .join(&quot;repo&quot;)
+        ));
+    }
+}
+</content>
+              </file>
+              <file name="cache.rs" path="/home/user/projs/dumpfs/src/git/cache.rs">
+                <metadata>
+                  <size>3550</size>
+                  <modified>2025-03-27T22:14:42.601872085+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>/*!
+ * Git repository cache management
+ */
+
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
+
+/// Clean up old repositories from cache
+pub fn clean_cache(days: u64) -&gt; io::Result&lt;usize&gt; {
+    let cache_dir = dirs::cache_dir()
+        .unwrap_or_else(|| PathBuf::from(&quot;~/.cache&quot;))
+        .join(&quot;dumpfs&quot;);
+
+    if !cache_dir.exists() {
+        return Ok(0);
+    }
+
+    let now = SystemTime::now();
+    let max_age = Duration::from_secs(days * 24 * 60 * 60);
+
+    // Clean all provider directories
+    let providers = [&quot;github&quot;, &quot;gitlab&quot;, &quot;bitbucket&quot;, &quot;git&quot;];
+
+    providers
+        .iter()
+        .map(|provider| cache_dir.join(provider))
+        .filter(|path| path.exists())
+        .try_fold(0, |acc, path| {
+            let count = clean_cache_dir(&amp;path, &amp;max_age, &amp;now)?;
+            Ok(acc + count)
+        })
+}
+
+/// Clean up repositories in a specific cache directory
+fn clean_cache_dir(dir: &amp;Path, max_age: &amp;Duration, now: &amp;SystemTime) -&gt; io::Result&lt;usize&gt; {
+    if !dir.exists() {
+        return Ok(0);
+    }
+
+    let mut count = 0;
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if !path.is_dir() {
+            continue;
+        }
+
+        if path.join(&quot;.git&quot;).exists() {
+            // It&apos;s a repository, check age
+            if let Ok(metadata) = fs::metadata(&amp;path) {
+                if let Ok(modified) = metadata.modified() {
+                    if let Ok(age) = now.duration_since(modified) {
+                        if age &gt; *max_age {
+                            // Remove old repository
+                            fs::remove_dir_all(&amp;path)?;
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        } else {
+            // It&apos;s a directory structure (like owner), recurse
+            count += clean_cache_dir(&amp;path, max_age, now)?;
+        }
+    }
+
+    Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_clean_cache() -&gt; io::Result&lt;()&gt; {
+        // Create a temporary directory for testing
+        let temp_dir = tempdir()?;
+        let cache_dir = temp_dir.path().join(&quot;dumpfs&quot;);
+
+        // Create structure for a GitHub repo
+        let repo_path = cache_dir.join(&quot;github&quot;).join(&quot;username&quot;).join(&quot;repo&quot;);
+        fs::create_dir_all(&amp;repo_path)?;
+
+        // Create a .git directory to identify it as a repo
+        fs::create_dir_all(repo_path.join(&quot;.git&quot;))?;
+
+        // Create a file with old modification time
+        let file_path = repo_path.join(&quot;test.txt&quot;);
+        let mut file = File::create(&amp;file_path)?;
+        writeln!(file, &quot;Test content&quot;)?;
+
+        // Override cache dir location for testing
+        let original_cache_dir = env::var(&quot;XDG_CACHE_HOME&quot;).ok();
+        env::set_var(&quot;XDG_CACHE_HOME&quot;, temp_dir.path());
+
+        // Call clean_cache_dir directly with zero days (should clean everything)
+        let now = SystemTime::now();
+        let max_age = Duration::from_secs(0); // 0 days means everything is older
+        let cleaned = clean_cache_dir(&amp;cache_dir.join(&quot;github&quot;), &amp;max_age, &amp;now)?;
+
+        assert_eq!(cleaned, 1); // Should clean up our one repo
+
+        // Restore original env var
+        if let Some(original) = original_cache_dir {
+            env::set_var(&quot;XDG_CACHE_HOME&quot;, original);
+        } else {
+            env::remove_var(&quot;XDG_CACHE_HOME&quot;);
+        }
+
+        Ok(())
+    }
+}
+</content>
+              </file>
+              <file name="repository.rs" path="/home/user/projs/dumpfs/src/git/repository.rs">
+                <metadata>
+                  <size>6664</size>
+                  <modified>2025-03-27T22:14:42.603872082+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>/*!
+ * Git repository operations
+ */
+
+use std::fs;
+use std::path::PathBuf;
+
+use git2::{FetchOptions, RemoteCallbacks, Repository as Git2Repository};
+
+use super::error::{GitError, GitResult};
+use super::progress::{GitProgress, ProgressReporter};
+use super::url::GitRepoInfo;
+
+/// Git repository with associated information
+pub struct Repository {
+    /// Inner git2 repository instance
+    inner: Git2Repository,
+    /// Repository information
+    info: GitRepoInfo,
+}
+
+impl Repository {
+    /// Open an existing Git repository
+    pub fn open(info: GitRepoInfo) -&gt; GitResult&lt;Self&gt; {
+        let repo = Git2Repository::open(&amp;info.cache_path).map_err(GitError::OpenError)?;
+
+        Ok(Self { inner: repo, info })
+    }
+
+    /// Check if a repository exists at the given cache path
+    pub fn exists(info: &amp;GitRepoInfo) -&gt; bool {
+        info.cache_path.join(&quot;.git&quot;).exists()
+    }
+
+    /// Clone a Git repository
+    pub fn clone&lt;P: ProgressReporter&gt;(info: GitRepoInfo, progress: Option&lt;&amp;P&gt;) -&gt; GitResult&lt;Self&gt; {
+        // Create cache directory if it doesn&apos;t exist
+        fs::create_dir_all(&amp;info.cache_path).map_err(GitError::IoError)?;
+
+        // Setup builder with progress reporting
+        let mut builder = git2::build::RepoBuilder::new();
+
+        if let Some(reporter) = progress {
+            let mut callbacks = RemoteCallbacks::new();
+            callbacks.transfer_progress(|stats| {
+                let progress = GitProgress {
+                    total_objects: stats.total_objects(),
+                    received_objects: stats.received_objects(),
+                    indexed_objects: stats.indexed_objects(),
+                    local_objects: stats.local_objects(),
+                    total_deltas: stats.total_deltas(),
+                    indexed_deltas: stats.indexed_deltas(),
+                    received_bytes: stats.received_bytes(),
+                };
+                reporter.report(&amp;progress);
+                true
+            });
+
+            let mut fetch_options = FetchOptions::new();
+            fetch_options.remote_callbacks(callbacks);
+            builder.fetch_options(fetch_options);
+        }
+
+        // Clone the repository
+        let repo = builder
+            .clone(&amp;info.url, &amp;info.cache_path)
+            .map_err(GitError::CloneError)?;
+
+        Ok(Self { inner: repo, info })
+    }
+
+    /// Pull latest changes for an existing repository
+    pub fn pull&lt;P: ProgressReporter&gt;(&amp;mut self, progress: Option&lt;&amp;P&gt;) -&gt; GitResult&lt;()&gt; {
+        // Set up fetch options with progress reporting
+        let mut fetch_options = FetchOptions::new();
+
+        if let Some(reporter) = progress {
+            let mut callbacks = RemoteCallbacks::new();
+            callbacks.transfer_progress(|stats| {
+                let progress = GitProgress {
+                    total_objects: stats.total_objects(),
+                    received_objects: stats.received_objects(),
+                    indexed_objects: stats.indexed_objects(),
+                    local_objects: stats.local_objects(),
+                    total_deltas: stats.total_deltas(),
+                    indexed_deltas: stats.indexed_deltas(),
+                    received_bytes: stats.received_bytes(),
+                };
+                reporter.report(&amp;progress);
+                true
+            });
+
+            fetch_options.remote_callbacks(callbacks);
+        }
+
+        // Fetch from remote
+        let mut remote = self
+            .inner
+            .find_remote(&quot;origin&quot;)
+            .map_err(GitError::FetchError)?;
+
+        remote
+            .fetch(&amp;[&quot;main&quot;, &quot;master&quot;], Some(&amp;mut fetch_options), None)
+            .map_err(GitError::FetchError)?;
+
+        // Find remote branch to reset to
+        let remote_branch = self
+            .inner
+            .find_reference(&quot;refs/remotes/origin/master&quot;)
+            .or_else(|_| self.inner.find_reference(&quot;refs/remotes/origin/main&quot;))
+            .map_err(GitError::FetchError)?;
+
+        // Get object to reset to
+        let obj = self
+            .inner
+            .revparse_single(remote_branch.name().unwrap())
+            .map_err(GitError::FetchError)?;
+
+        // Reset to remote branch
+        self.inner
+            .reset(&amp;obj, git2::ResetType::Hard, None)
+            .map_err(GitError::FetchError)?;
+
+        Ok(())
+    }
+
+    /// Get repository information
+    pub fn info(&amp;self) -&gt; &amp;GitRepoInfo {
+        &amp;self.info
+    }
+
+    /// Get path to the repository
+    pub fn path(&amp;self) -&gt; &amp;PathBuf {
+        &amp;self.info.cache_path
+    }
+}
+
+/// Repository operation builder for more flexible configuration
+pub struct RepositoryBuilder {
+    /// Repository information
+    info: GitRepoInfo,
+    /// Optional fetch options
+    fetch_options: Option&lt;FetchOptions&lt;&apos;static&gt;&gt;,
+}
+
+impl RepositoryBuilder {
+    /// Create a new repository builder
+    pub fn new(info: GitRepoInfo) -&gt; Self {
+        Self {
+            info,
+            fetch_options: None,
+        }
+    }
+
+    /// Configure with progress reporting
+    pub fn with_progress&lt;P: ProgressReporter + &apos;static&gt;(mut self, reporter: P) -&gt; Self {
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.transfer_progress(move |stats| {
+            let progress = GitProgress {
+                total_objects: stats.total_objects(),
+                received_objects: stats.received_objects(),
+                indexed_objects: stats.indexed_objects(),
+                local_objects: stats.local_objects(),
+                total_deltas: stats.total_deltas(),
+                indexed_deltas: stats.indexed_deltas(),
+                received_bytes: stats.received_bytes(),
+            };
+            reporter.report(&amp;progress);
+            true
+        });
+
+        let mut fetch_options = FetchOptions::new();
+        fetch_options.remote_callbacks(callbacks);
+        self.fetch_options = Some(fetch_options);
+
+        self
+    }
+
+    /// Clone the repository
+    pub fn clone(self) -&gt; GitResult&lt;Repository&gt; {
+        // Create cache directory if it doesn&apos;t exist
+        fs::create_dir_all(&amp;self.info.cache_path).map_err(GitError::IoError)?;
+
+        // Setup builder
+        let mut builder = git2::build::RepoBuilder::new();
+
+        if let Some(fetch_options) = self.fetch_options {
+            builder.fetch_options(fetch_options);
+        }
+
+        // Clone the repository
+        let repo = builder
+            .clone(&amp;self.info.url, &amp;self.info.cache_path)
+            .map_err(GitError::CloneError)?;
+
+        Ok(Repository {
+            inner: repo,
+            info: self.info,
+        })
+    }
+
+    /// Open an existing repository
+    pub fn open(self) -&gt; GitResult&lt;Repository&gt; {
+        Repository::open(self.info)
+    }
+}
+</content>
+              </file>
+              <file name="mod.rs" path="/home/user/projs/dumpfs/src/git/mod.rs">
+                <metadata>
+                  <size>2472</size>
+                  <modified>2025-03-27T22:14:42.601872085+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>/*!
+ * Git repository handling functionality
+ */
+
+mod cache;
+mod error;
+mod progress;
+mod repository;
+mod url;
+
+// Re-export public items
+pub use cache::clean_cache;
+pub use error::{GitError, GitResult};
+pub use progress::{GitProgress, ProgressReporter};
+pub use repository::{Repository, RepositoryBuilder};
+pub use url::{is_git_url, parse_git_url, GitHost, GitRepoInfo};
+
+use std::io;
+use std::path::PathBuf;
+
+/// Clone or update a Git repository
+///
+/// This function maintains compatibility with the original API
+/// while using the new implementation internally.
+pub fn clone_repository&lt;P: ProgressReporter&gt;(
+    url: &amp;str,
+    progress_fn: Option&lt;&amp;P&gt;,
+) -&gt; io::Result&lt;PathBuf&gt; {
+    // Parse the URL
+    let info = match url::parse_git_url(url) {
+        Ok(info) =&gt; info,
+        Err(e) =&gt; return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),
+    };
+
+    // Check if repository already exists
+    if Repository::exists(&amp;info) {
+        // Try to open and pull
+        match Repository::open(info.clone()) {
+            Ok(mut repo) =&gt; {
+                if let Err(e) = repo.pull(progress_fn) {
+                    return Err(io::Error::new(io::ErrorKind::Other, e.to_string()));
+                }
+                Ok(repo.path().clone())
+            }
+            Err(e) =&gt; Err(io::Error::new(io::ErrorKind::Other, e.to_string())),
+        }
+    } else {
+        // Clone the repository
+        match Repository::clone(info.clone(), progress_fn) {
+            Ok(repo) =&gt; Ok(repo.path().clone()),
+            Err(e) =&gt; Err(io::Error::new(io::ErrorKind::Other, e.to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::string::ToString;
+
+    #[test]
+    fn test_git_host_display() {
+        assert_eq!(GitHost::GitHub.to_string(), &quot;GitHub&quot;);
+        assert_eq!(GitHost::GitLab.to_string(), &quot;GitLab&quot;);
+        assert_eq!(GitHost::Bitbucket.to_string(), &quot;Bitbucket&quot;);
+        assert_eq!(
+            GitHost::Other(&quot;custom.com&quot;.to_string()).to_string(),
+            &quot;custom.com&quot;
+        );
+    }
+
+    #[test]
+    fn test_git_repo_info_display() {
+        let info = GitRepoInfo {
+            url: &quot;https://github.com/username/repo&quot;.to_string(),
+            host: GitHost::GitHub,
+            owner: &quot;username&quot;.to_string(),
+            name: &quot;repo&quot;.to_string(),
+            cache_path: PathBuf::from(&quot;/tmp/cache/github/username/repo&quot;),
+        };
+
+        assert_eq!(info.to_string(), &quot;GitHub/username/repo&quot;);
+    }
+}
+</content>
+              </file>
+            </contents>
+          </directory>
+          <directory name="tokenizer" path="/home/user/projs/dumpfs/src/tokenizer">
+            <metadata>
+              <size>114</size>
+              <modified>2025-03-27T22:45:06.431237412+03:00</modified>
+              <permissions>755</permissions>
+            </metadata>
+            <contents>
+              <directory name="provider" path="/home/user/projs/dumpfs/src/tokenizer/provider">
+                <metadata>
+                  <size>82</size>
+                  <modified>2025-03-27T22:32:13.770964825+03:00</modified>
+                  <permissions>755</permissions>
+                </metadata>
+                <contents>
+                  <file name="mod.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/mod.rs">
+                    <metadata>
+                      <size>454</size>
+                      <modified>2025-03-27T22:43:23.364948563+03:00</modified>
+                      <permissions>644</permissions>
+                    </metadata>
+                    <content>//! Provider implementations for different tokenizer backends
+
+pub mod anthropic;
+pub mod huggingface;
+pub mod openai;
+
+use crate::tokenizer::error::TokenizerResult;
+
+/// Trait for tokenizer provider implementations
+pub trait Provider: Send + Sync {
+    /// Count tokens in the given text
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;usize&gt;;
+
+    /// Get the context window size for this model
+    fn model_context_window(&amp;self) -&gt; usize;
+}
+</content>
+                  </file>
+                  <file name="anthropic.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/anthropic.rs">
+                    <metadata>
+                      <size>2249</size>
+                      <modified>2025-03-27T22:43:23.364948563+03:00</modified>
+                      <permissions>644</permissions>
+                    </metadata>
+                    <content>//! Anthropic Claude tokenizer implementation
+
+use reqwest::blocking::Client;
+use serde::Deserialize;
+use serde_json::json;
+use std::env;
+
+use super::Provider;
+use crate::tokenizer::error::{TokenizerError, TokenizerResult};
+use crate::tokenizer::model::Model;
+
+/// Claude tokenizer implementation
+pub struct ClaudeProvider {
+    model: Model,
+    client: Client,
+}
+
+impl ClaudeProvider {
+    /// Create a new Claude tokenizer
+    pub fn new(model: Model) -&gt; Self {
+        Self {
+            model,
+            client: Client::new(),
+        }
+    }
+}
+
+impl Provider for ClaudeProvider {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;usize&gt; {
+        // Get API key from environment
+        let api_key = env::var(&quot;ANTHROPIC_API_KEY&quot;).map_err(|_| {
+            TokenizerError::EnvVarError(
+                &quot;ANTHROPIC_API_KEY environment variable not set&quot;.to_string(),
+            )
+        })?;
+
+        // Send request to token counting endpoint
+        let response = self
+            .client
+            .post(&quot;https://api.anthropic.com/v1/messages/count_tokens&quot;)
+            .header(&quot;x-api-key&quot;, api_key)
+            .header(&quot;content-type&quot;, &quot;application/json&quot;)
+            .header(&quot;anthropic-version&quot;, &quot;2023-06-01&quot;)
+            .json(&amp;json!({
+                &quot;model&quot;: self.model.model_id(),
+                &quot;messages&quot;: [{
+                    &quot;role&quot;: &quot;user&quot;,
+                    &quot;content&quot;: text
+                }]
+            }))
+            .send()?;
+
+        // Check response status
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| &quot;Unable to read error message&quot;.to_string());
+
+            return Err(TokenizerError::ApiError(format!(
+                &quot;Claude API returned error status {}: {}&quot;,
+                status, error_text
+            )));
+        }
+
+        // Parse the response
+        #[derive(Deserialize)]
+        struct TokenResponse {
+            input_tokens: usize,
+        }
+
+        let token_response: TokenResponse = response.json()?;
+
+        Ok(token_response.input_tokens)
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.model.context_window()
+    }
+}
+</content>
+                  </file>
+                  <file name="openai.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/openai.rs">
+                    <metadata>
+                      <size>901</size>
+                      <modified>2025-03-27T22:43:23.364948563+03:00</modified>
+                      <permissions>644</permissions>
+                    </metadata>
+                    <content>//! OpenAI tokenizer implementation using tiktoken
+
+use tiktoken_rs::CoreBPE;
+
+use super::Provider;
+use crate::tokenizer::error::{TokenizerError, TokenizerResult};
+use crate::tokenizer::model::Model;
+
+/// OpenAI tokenizer implementation
+pub struct OpenAIProvider {
+    model: Model,
+    encoding: CoreBPE,
+}
+
+impl OpenAIProvider {
+    /// Create a new OpenAI tokenizer
+    pub fn new(model: Model) -&gt; TokenizerResult&lt;Self&gt; {
+        let encoding = tiktoken_rs::get_bpe_from_model(model.model_id())
+            .map_err(|e| TokenizerError::TokenizerError(e.to_string()))?;
+
+        Ok(Self { model, encoding })
+    }
+}
+
+impl Provider for OpenAIProvider {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;usize&gt; {
+        let tokens = self.encoding.encode_ordinary(text);
+        Ok(tokens.len())
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.model.context_window()
+    }
+}
+</content>
+                  </file>
+                  <file name="huggingface.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/huggingface.rs">
+                    <metadata>
+                      <size>2364</size>
+                      <modified>2025-03-27T22:43:23.364948563+03:00</modified>
+                      <permissions>644</permissions>
+                    </metadata>
+                    <content>//! HuggingFace tokenizer implementation
+
+use once_cell::sync::OnceCell;
+use std::sync::Mutex;
+use tokenizers::Tokenizer as HfTokenizer;
+
+use super::Provider;
+use crate::tokenizer::error::{TokenizerError, TokenizerResult};
+use crate::tokenizer::model::Model;
+
+/// HuggingFace tokenizer implementation
+pub struct HuggingFaceProvider {
+    model: Model,
+    repo_id: &amp;&apos;static str,
+    tokenizer: OnceCell&lt;Mutex&lt;HfTokenizer&gt;&gt;,
+}
+
+impl HuggingFaceProvider {
+    /// Create a new HuggingFace tokenizer
+    pub fn new(model: Model) -&gt; Self {
+        Self {
+            model,
+            repo_id: model.model_id(),
+            tokenizer: OnceCell::new(),
+        }
+    }
+
+    /// Get or initialize the tokenizer
+    fn get_tokenizer(&amp;self) -&gt; TokenizerResult&lt;&amp;Mutex&lt;HfTokenizer&gt;&gt; {
+        self.tokenizer.get_or_try_init(|| {
+            // Try to load the tokenizer from HuggingFace
+            let tokenizer = match HfTokenizer::from_pretrained(self.repo_id, None) {
+                Ok(t) =&gt; t,
+                Err(e) =&gt; {
+                    // Fall back to a basic BPE tokenizer
+                    eprintln!(&quot;Error loading tokenizer: {}, using fallback&quot;, e);
+                    let mut tokenizer = HfTokenizer::new(tokenizers::models::bpe::BPE::default());
+
+                    // Configure for LLaMA-like tokenization
+                    tokenizer.with_pre_tokenizer(Some(
+                        tokenizers::pre_tokenizers::whitespace::Whitespace,
+                    ));
+
+                    tokenizer
+                }
+            };
+
+            Ok(Mutex::new(tokenizer))
         })
     }
 }
 
-zed::register_extension!(PostgresModelContextExtension);
+impl Provider for HuggingFaceProvider {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;usize&gt; {
+        // Get the tokenizer
+        let tokenizer_mutex = self.get_tokenizer()?;
+
+        // Acquire the lock
+        let tokenizer = tokenizer_mutex
+            .lock()
+            .map_err(|_| TokenizerError::TokenizerError(&quot;Failed to lock tokenizer&quot;.to_string()))?;
+
+        // Encode the text
+        let encoding = tokenizer
+            .encode(text, false)
+            .map_err(|e| TokenizerError::TokenizerError(format!(&quot;Failed to encode text: {}&quot;, e)))?;
+
+        // Get the token count
+        let tokens = encoding.get_ids().len();
+
+        Ok(tokens)
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.model.context_window()
+    }
+}
+</content>
+                  </file>
+                </contents>
+              </directory>
+              <file name="error.rs" path="/home/user/projs/dumpfs/src/tokenizer/error.rs">
+                <metadata>
+                  <size>1324</size>
+                  <modified>2025-03-27T22:43:23.362948557+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>//! Error types for the tokenizer module
+
+use std::io;
+use thiserror::Error;
+
+/// Result type for tokenizer operations
+pub type TokenizerResult&lt;T&gt; = Result&lt;T, TokenizerError&gt;;
+
+/// Errors that can occur during tokenization
+#[derive(Error, Debug)]
+pub enum TokenizerError {
+    /// Error from API call
+    #[error(&quot;API error: {0}&quot;)]
+    ApiError(String),
+
+    /// Error from tokenizer library
+    #[error(&quot;Tokenizer error: {0}&quot;)]
+    TokenizerError(String),
+
+    /// Model is not supported
+    #[error(&quot;Unsupported model: {0}&quot;)]
+    UnsupportedModel(String),
+
+    /// Required environment variable not set
+    #[error(&quot;Environment variable not set: {0}&quot;)]
+    EnvVarError(String),
+
+    /// Cache operation error
+    #[error(&quot;Cache error: {0}&quot;)]
+    CacheError(String),
+
+    /// Failed to acquire lock on cache
+    #[error(&quot;Failed to acquire lock on cache&quot;)]
+    CacheLockError,
+
+    /// IO error
+    #[error(&quot;IO error: {0}&quot;)]
+    IoError(#[from] io::Error),
+
+    /// JSON serialization/deserialization error
+    #[error(&quot;JSON error: {0}&quot;)]
+    JsonError(#[from] serde_json::Error),
+
+    /// Request error
+    #[error(&quot;Request error: {0}&quot;)]
+    RequestError(String),
+}
+
+impl From&lt;reqwest::Error&gt; for TokenizerError {
+    fn from(error: reqwest::Error) -&gt; Self {
+        TokenizerError::RequestError(error.to_string())
+    }
+}
+</content>
+              </file>
+              <file name="model.rs" path="/home/user/projs/dumpfs/src/tokenizer/model.rs">
+                <metadata>
+                  <size>2984</size>
+                  <modified>2025-03-27T22:43:23.363948560+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>//! Model definitions and metadata
+
+use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use strum::{Display, EnumIter, EnumProperty, EnumString};
+
+/// Supported LLM models for tokenization
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    EnumIter,
+    Display,
+    ValueEnum,
+    Serialize,
+    Deserialize,
+    EnumProperty,
+)]
+pub enum Model {
+    #[strum(props(
+        model_id = &quot;claude-3-5-sonnet-latest&quot;,
+        context_window = &quot;200000&quot;,
+        provider = &quot;anthropic&quot;
+    ))]
+    Sonnet35,
+
+    #[strum(props(
+        model_id = &quot;claude-3-7-sonnet-latest&quot;,
+        context_window = &quot;200000&quot;,
+        provider = &quot;anthropic&quot;
+    ))]
+    Sonnet37,
+
+    // OpenAI models
+    #[strum(props(model_id = &quot;gpt-4&quot;, context_window = &quot;8192&quot;, provider = &quot;openai&quot;))]
+    Gpt4,
+
+    #[strum(props(
+        model_id = &quot;gpt-4-0125-preview&quot;,
+        context_window = &quot;128000&quot;,
+        provider = &quot;openai&quot;
+    ))]
+    Gpt4Turbo,
+
+    #[strum(props(model_id = &quot;gpt-4o&quot;, context_window = &quot;8192&quot;, provider = &quot;openai&quot;))]
+    Gpt4o,
+
+    // HuggingFace models
+    #[strum(props(
+        model_id = &quot;meta-llama/Llama-2-7b-hf&quot;,
+        context_window = &quot;4096&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    Llama2_7b,
+
+    #[strum(props(
+        model_id = &quot;meta-llama/Llama-3-8b-hf&quot;,
+        context_window = &quot;8192&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    Llama3_8b,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Small-3.1-24B-Base-2503&quot;,
+        context_window = &quot;128000&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralSmall24B,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Large-Instruct-2411&quot;,
+        context_window = &quot;128000&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralLargeInstruct,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Pixtral-12B-Base-2409&quot;,
+        context_window = &quot;128000&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    Pixtral12B,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Small-Instruct-2409&quot;,
+        context_window = &quot;32000&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralSmall,
+}
+
+impl Model {
+    /// Get the context window size for this model
+    pub fn context_window(&amp;self) -&gt; usize {
+        self.get_int(&quot;context_window&quot;).unwrap_or(0) as usize
+    }
+
+    /// Get the provider of this model
+    pub fn provider(&amp;self) -&gt; ModelProvider {
+        let provider = self.get_str(&quot;provider&quot;).unwrap_or(&quot;unknown&quot;);
+        ModelProvider::from_str(provider).unwrap_or(ModelProvider::HuggingFace)
+    }
+
+    /// Get the model identifier as used by the provider&apos;s API
+    pub fn model_id(&amp;self) -&gt; &amp;&apos;static str {
+        self.get_str(&quot;model_id&quot;).unwrap_or(&quot;unknown&quot;)
+    }
+}
+
+/// Model providers
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, Display)]
+#[strum(serialize_all = &quot;lowercase&quot;)]
+pub enum ModelProvider {
+    /// Anthropic (Claude models)
+    Anthropic,
+    /// OpenAI (GPT models)
+    OpenAI,
+    /// HuggingFace models
+    HuggingFace,
+}
+</content>
+              </file>
+              <file name="cache.rs" path="/home/user/projs/dumpfs/src/tokenizer/cache.rs">
+                <metadata>
+                  <size>6854</size>
+                  <modified>2025-03-27T22:43:23.361948554+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>//! Token cache implementation
+
+use std::collections::hash_map::DefaultHasher;
+use std::fs;
+use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+
+use crate::tokenizer::error::{TokenizerError, TokenizerResult};
+
+// Global cache statistics for easier access
+static CACHE_HITS: AtomicUsize = AtomicUsize::new(0);
+static CACHE_MISSES: AtomicUsize = AtomicUsize::new(0);
+
+/// Cache entry with token count and model identifier
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TokenCacheEntry {
+    /// Hash of the content
+    hash: u64,
+    /// Model used for tokenization
+    model: String,
+    /// Token count
+    tokens: usize,
+    /// Timestamp when the entry was created
+    timestamp: u64,
+}
+
+/// Statistics for token cache
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CacheStats {
+    /// Number of cache hits
+    pub hits: usize,
+    /// Number of cache misses
+    pub misses: usize,
+}
+
+impl CacheStats {
+    /// Get global cache statistics
+    pub fn global() -&gt; Self {
+        Self {
+            hits: CACHE_HITS.load(Ordering::Relaxed),
+            misses: CACHE_MISSES.load(Ordering::Relaxed),
+        }
+    }
+}
+
+/// Cache for token counts to avoid redundant processing
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TokenCache {
+    /// Cached token entries
+    entries: Vec&lt;TokenCacheEntry&gt;,
+
+    #[serde(skip)]
+    local_hits: usize,
+
+    #[serde(skip)]
+    local_misses: usize,
+}
+
+impl TokenCache {
+    /// Create a new token cache
+    pub fn new(project_dir: &amp;str) -&gt; TokenizerResult&lt;Self&gt; {
+        // Try to load from disk, fall back to empty cache
+        let cache = Self::load(project_dir).unwrap_or_else(|_| Self {
+            entries: Vec::new(),
+            local_hits: 0,
+            local_misses: 0,
+        });
+
+        // Clean old entries
+        cache.clean_old_entries(project_dir).ok();
+
+        Ok(cache)
+    }
+
+    /// Calculate hash for content
+    fn hash_content(&amp;self, content: &amp;str) -&gt; u64 {
+        let mut hasher = DefaultHasher::new();
+        content.hash(&amp;mut hasher);
+        hasher.finish()
+    }
+
+    /// Get token count from cache if available
+    pub fn get(&amp;mut self, content: &amp;str, model_id: &amp;str) -&gt; Option&lt;usize&gt; {
+        let hash = self.hash_content(content);
+
+        // Find matching entry
+        let result = self
+            .entries
+            .iter()
+            .find(|entry| entry.hash == hash &amp;&amp; entry.model == model_id)
+            .map(|entry| entry.tokens);
+
+        // Update statistics
+        if result.is_some() {
+            self.local_hits += 1;
+            CACHE_HITS.fetch_add(1, Ordering::Relaxed);
+        } else {
+            self.local_misses += 1;
+            CACHE_MISSES.fetch_add(1, Ordering::Relaxed);
+        }
+
+        result
+    }
+
+    /// Insert token count into cache
+    pub fn insert(
+        &amp;mut self,
+        content: &amp;str,
+        model_id: &amp;str,
+        count: usize,
+        project_dir: &amp;str,
+    ) -&gt; TokenizerResult&lt;()&gt; {
+        let hash = self.hash_content(content);
+
+        // Remove existing entry with same hash and model
+        self.entries
+            .retain(|entry| !(entry.hash == hash &amp;&amp; entry.model == model_id));
+
+        // Add new entry
+        self.entries.push(TokenCacheEntry {
+            hash,
+            model: model_id.to_string(),
+            tokens: count,
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        });
+
+        // Save cache to disk
+        self.save(project_dir)?;
+
+        Ok(())
+    }
+
+    /// Get cache statistics
+    pub fn get_stats(&amp;self) -&gt; CacheStats {
+        CacheStats {
+            hits: self.local_hits,
+            misses: self.local_misses,
+        }
+    }
+
+    /// Clean old cache entries (older than 7 days)
+    fn clean_old_entries(&amp;self, project_dir: &amp;str) -&gt; TokenizerResult&lt;()&gt; {
+        let mut cache = self.clone();
+
+        // Current timestamp
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // 7 days in seconds
+        const WEEK_IN_SECS: u64 = 7 * 24 * 60 * 60;
+
+        // Remove entries older than a week
+        let old_len = cache.entries.len();
+        cache
+            .entries
+            .retain(|entry| now - entry.timestamp &lt; WEEK_IN_SECS);
+
+        // If we removed any entries, save the file
+        if cache.entries.len() &lt; old_len {
+            cache.save(project_dir)?;
+        }
+
+        Ok(())
+    }
+
+    /// Load cache from disk
+    pub fn load(project_dir: &amp;str) -&gt; TokenizerResult&lt;Self&gt; {
+        let path = get_cache_path(project_dir)?;
+
+        if !path.exists() {
+            return Err(TokenizerError::CacheError(
+                &quot;Cache file not found&quot;.to_string(),
+            ));
+        }
+
+        let content = fs::read_to_string(&amp;path)?;
+        let mut cache: Self = serde_json::from_str(&amp;content)?;
+
+        // Initialize counters
+        cache.local_hits = 0;
+        cache.local_misses = 0;
+
+        Ok(cache)
+    }
+
+    /// Save cache to disk
+    pub fn save(&amp;self, project_dir: &amp;str) -&gt; TokenizerResult&lt;()&gt; {
+        let content = serde_json::to_string(self)?;
+        let path = get_cache_path(project_dir)?;
+
+        // Create parent directory if it doesn&apos;t exist
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        fs::write(&amp;path, content)?;
+
+        Ok(())
+    }
+
+    /// Clone the cache for internal use
+    fn clone(&amp;self) -&gt; Self {
+        Self {
+            entries: self.entries.clone(),
+            local_hits: self.local_hits,
+            local_misses: self.local_misses,
+        }
+    }
+}
+
+/// Get the path to the token cache file for a specific project directory
+pub fn get_cache_path(project_dir: &amp;str) -&gt; TokenizerResult&lt;PathBuf&gt; {
+    // Get home directory
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        TokenizerError::CacheError(&quot;Could not determine home directory&quot;.to_string())
+    })?;
+
+    // Create cache directory path
+    let cache_dir = home_dir.join(&quot;.cache&quot;).join(&quot;dumpfs&quot;);
+
+    // Create a sanitized filename based on the project directory path
+    let canonical_path = fs::canonicalize(project_dir)
+        .map_err(|e| TokenizerError::CacheError(format!(&quot;Invalid project directory: {}&quot;, e)))?;
+
+    // Convert the path to a string, removing any invalid characters
+    let path_str = canonical_path.to_string_lossy().to_string();
+    let sanitized_path = path_str.replace(
+        |c: char| !c.is_alphanumeric() &amp;&amp; c != &apos;_&apos; &amp;&amp; c != &apos;-&apos; &amp;&amp; c != &apos;.&apos;,
+        &quot;_&quot;,
+    );
+
+    // Create the cache file path
+    let cache_file = cache_dir.join(format!(&quot;{}.token_cache.json&quot;, sanitized_path));
+
+    Ok(cache_file)
+}
+</content>
+              </file>
+              <file name="mod.rs" path="/home/user/projs/dumpfs/src/tokenizer/mod.rs">
+                <metadata>
+                  <size>7529</size>
+                  <modified>2025-03-27T22:43:23.363948560+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>//! Tokenizer module for token counting with different LLM models
+//!
+//! Handles tokenization for various LLM models from different providers
+//! with efficient caching to improve performance.
+
+mod cache;
+mod error;
+mod model;
+mod provider;
+
+// Re-exports for public API
+pub use cache::CacheStats;
+pub use error::{TokenizerError, TokenizerResult};
+pub use model::{Model, ModelProvider};
+
+use cache::TokenCache;
+use provider::Provider;
+use std::sync::{Arc, Mutex};
+
+/// Result of token counting operation
+#[derive(Debug, Clone, Copy)]
+pub struct TokenCount {
+    /// Number of tokens in the text
+    pub tokens: usize,
+    /// Whether this was a cache hit (if caching is enabled)
+    pub cached: Option&lt;bool&gt;,
+}
+
+/// Trait defining the interface for tokenizers
+pub trait Tokenizer: Send + Sync {
+    /// Count tokens in the given text
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;TokenCount&gt;;
+
+    /// Get the context window size for this model
+    fn model_context_window(&amp;self) -&gt; usize;
+}
+
+/// Create a tokenizer for the specified model
+pub fn create_tokenizer(model: Model, project_dir: &amp;str) -&gt; TokenizerResult&lt;Box&lt;dyn Tokenizer&gt;&gt; {
+    // Create the appropriate provider based on model
+    let provider: Box&lt;dyn Provider&gt; = match model.provider() {
+        ModelProvider::Anthropic =&gt; Box::new(provider::anthropic::ClaudeProvider::new(model)),
+        ModelProvider::OpenAI =&gt; Box::new(provider::openai::OpenAIProvider::new(model)?),
+        ModelProvider::HuggingFace =&gt; {
+            Box::new(provider::huggingface::HuggingFaceProvider::new(model))
+        }
+    };
+
+    // Wrap with caching tokenizer
+    let cache = Arc::new(Mutex::new(TokenCache::new(project_dir)?));
+
+    Ok(Box::new(CachingTokenizer::new(
+        provider,
+        model,
+        cache,
+        project_dir.to_string(),
+    )))
+}
+
+/// Get global cache statistics
+pub fn get_global_cache_stats() -&gt; CacheStats {
+    CacheStats::global()
+}
+
+/// Tokenizer that caches results to avoid repeated tokenization
+pub struct CachingTokenizer {
+    provider: Box&lt;dyn Provider&gt;,
+    model: Model,
+    cache: Arc&lt;Mutex&lt;TokenCache&gt;&gt;,
+    project_dir: String,
+}
+
+impl CachingTokenizer {
+    /// Create a new cached tokenizer
+    pub fn new(
+        provider: Box&lt;dyn Provider&gt;,
+        model: Model,
+        cache: Arc&lt;Mutex&lt;TokenCache&gt;&gt;,
+        project_dir: String,
+    ) -&gt; Self {
+        Self {
+            provider,
+            model,
+            cache,
+            project_dir,
+        }
+    }
+
+    /// Get cache statistics
+    pub fn get_cache_stats(&amp;self) -&gt; CacheStats {
+        if let Ok(cache) = self.cache.lock() {
+            cache.get_stats()
+        } else {
+            CacheStats::default()
+        }
+    }
+}
+
+impl Tokenizer for CachingTokenizer {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;TokenCount&gt; {
+        let model_id = self.model.model_id();
+
+        // Try to get from cache
+        let cached = self
+            .cache
+            .lock()
+            .map_err(|_| TokenizerError::CacheLockError)?
+            .get(text, model_id);
+
+        // If found in cache, return it
+        if let Some(count) = cached {
+            return Ok(TokenCount {
+                tokens: count,
+                cached: Some(true),
+            });
+        }
+
+        // If not in cache, use the provider
+        let result = self.provider.count_tokens(text)?;
+
+        // Update cache
+        self.cache
+            .lock()
+            .map_err(|_| TokenizerError::CacheLockError)?
+            .insert(text, model_id, result, &amp;self.project_dir)?;
+
+        Ok(TokenCount {
+            tokens: result,
+            cached: Some(false),
+        })
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.model.context_window()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tokenizer::error::TokenizerResult;
+    use std::env;
+
+    // No unused mock types needed
+
+    // Simple mock tokenizer that doesn&apos;t rely on external dependencies
+    struct MockTokenizer {
+        context_window: usize,
+    }
+
+    impl Tokenizer for MockTokenizer {
+        fn count_tokens(&amp;self, _text: &amp;str) -&gt; TokenizerResult&lt;TokenCount&gt; {
+            Ok(TokenCount {
+                tokens: 42,
+                cached: None,
+            })
+        }
+
+        fn model_context_window(&amp;self) -&gt; usize {
+            self.context_window
+        }
+    }
+
+    #[test]
+    fn test_create_tokenizer() {
+        // Use a mock tokenizer directly to avoid external dependencies
+        let tokenizer = MockTokenizer {
+            context_window: 8192,
+        };
+
+        // Test the context window
+        assert_eq!(tokenizer.model_context_window(), 8192);
+
+        // Test token counting
+        let result = tokenizer.count_tokens(&quot;Hello, world!&quot;);
+        assert!(result.is_ok());
+
+        let count = result.unwrap();
+        assert_eq!(count.tokens, 42);
+    }
+
+    #[test]
+    fn test_tokenizer_caching() {
+        // Create an in-memory cache that doesn&apos;t touch the filesystem
+        struct InMemoryCache {
+            storage: std::collections::HashMap&lt;String, usize&gt;,
+        }
+
+        impl InMemoryCache {
+            fn new() -&gt; Self {
+                Self {
+                    storage: std::collections::HashMap::new(),
+                }
+            }
+
+            fn get(&amp;mut self, key: &amp;str) -&gt; Option&lt;usize&gt; {
+                self.storage.get(key).copied()
+            }
+
+            fn insert(&amp;mut self, key: &amp;str, value: usize) {
+                self.storage.insert(key.to_string(), value);
+            }
+        }
+
+        // Create a simple tokenizer with caching logic for testing
+        struct TestTokenizer {
+            cache: InMemoryCache,
+        }
+
+        impl TestTokenizer {
+            fn new() -&gt; Self {
+                Self {
+                    cache: InMemoryCache::new(),
+                }
+            }
+
+            fn count_tokens(&amp;mut self, text: &amp;str) -&gt; (usize, bool) {
+                // Check cache first
+                if let Some(count) = self.cache.get(text) {
+                    return (count, true); // Cache hit
+                }
+
+                // &quot;Calculate&quot; tokens
+                let count = 42;
+
+                // Store in cache
+                self.cache.insert(text, count);
+
+                (count, false) // Cache miss
+            }
+        }
+
+        // Test the caching logic
+        let mut tokenizer = TestTokenizer::new();
+
+        // First call should be a cache miss
+        let (count1, cached1) = tokenizer.count_tokens(&quot;Hello, world!&quot;);
+        assert_eq!(count1, 42);
+        assert_eq!(cached1, false);
+
+        // Second call should be a cache hit
+        let (count2, cached2) = tokenizer.count_tokens(&quot;Hello, world!&quot;);
+        assert_eq!(count2, 42);
+        assert_eq!(cached2, true);
+    }
+
+    #[test]
+    #[ignore] // Skip this test by default since it requires an API key
+    fn test_claude_tokenizer() {
+        // Only run this test if ANTHROPIC_API_KEY is set
+        match env::var(&quot;ANTHROPIC_API_KEY&quot;) {
+            Ok(api_key) if !api_key.is_empty() =&gt; {
+                let tokenizer = create_tokenizer(Model::Sonnet37, &quot;test_dir&quot;).unwrap();
+                let result = tokenizer.count_tokens(&quot;Hello, Claude!&quot;);
+
+                assert!(result.is_ok());
+                let count = result.unwrap();
+                assert!(count.tokens &gt; 0);
+            }
+            _ =&gt; {
+                // Skip test when API key is not available
+                println!(&quot;Skipping Claude tokenizer test (no API key)&quot;);
+            }
+        }
+    }
+}
+</content>
+              </file>
+            </contents>
+          </directory>
+          <file name="types.rs" path="/home/user/projs/dumpfs/src/types.rs">
+            <metadata>
+              <size>2152</size>
+              <modified>2025-03-26T22:36:05.617711743+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Core types and data structures for the DumpFS application
+ */
+
+use std::path::PathBuf;
+use std::time::SystemTime;
+
+/// Represents different types of filesystem entries
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileType {
+    /// Text file with readable content
+    TextFile,
+    /// Binary file (non-text)
+    BinaryFile,
+    /// Symbolic link to another file
+    Symlink,
+    /// Directory containing other entries
+    Directory,
+    /// Other file types
+    Other,
+}
+
+/// Metadata about a filesystem entry
+#[derive(Debug, Clone)]
+pub struct Metadata {
+    /// Size in bytes
+    pub size: u64,
+    /// Last modification time
+    pub modified: SystemTime,
+    /// File permissions in octal format
+    pub permissions: String,
+}
+
+/// Represents a directory in the file system
+#[derive(Debug, Clone)]
+pub struct DirectoryNode {
+    /// Directory name
+    pub name: String,
+    /// Relative path from scan root
+    pub path: PathBuf,
+    /// Directory metadata
+    pub metadata: Metadata,
+    /// Directory contents
+    pub contents: Vec&lt;Node&gt;,
+}
+
+/// Represents a text file
+#[derive(Debug, Clone)]
+pub struct FileNode {
+    /// File name
+    pub name: String,
+    /// Relative path from scan root
+    pub path: PathBuf,
+    /// File metadata
+    pub metadata: Metadata,
+    /// File content (may be None if too large)
+    pub content: Option&lt;String&gt;,
+}
+
+/// Represents a binary file
+#[derive(Debug, Clone)]
+pub struct BinaryNode {
+    /// File name
+    pub name: String,
+    /// Relative path from scan root
+    pub path: PathBuf,
+    /// File metadata
+    pub metadata: Metadata,
+}
+
+/// Represents a symbolic link
+#[derive(Debug, Clone)]
+pub struct SymlinkNode {
+    /// Link name
+    pub name: String,
+    /// Relative path from scan root
+    pub path: PathBuf,
+    /// Link metadata
+    pub metadata: Metadata,
+    /// Target of the symlink
+    pub target: String,
+}
+
+/// A generic filesystem node
+#[derive(Debug, Clone)]
+pub enum Node {
+    /// Directory node
+    Directory(DirectoryNode),
+    /// Text file node
+    File(FileNode),
+    /// Binary file node
+    Binary(BinaryNode),
+    /// Symbolic link node
+    Symlink(SymlinkNode),
+}
+</content>
+          </file>
+          <file name="utils.rs" path="/home/user/projs/dumpfs/src/utils.rs">
+            <metadata>
+              <size>4749</size>
+              <modified>2025-03-27T00:25:03.921940764+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Utility functions for DumpFS
+ */
+
+use std::io;
+use std::path::Path;
+use std::sync::Arc;
+
+use ignore::WalkBuilder;
+use indicatif::ProgressBar;
+use once_cell::sync::Lazy;
+use walkdir::WalkDir;
+
+use crate::config::Config;
+use crate::scanner::Scanner;
+
+/// Count total files for progress tracking
+pub fn count_files(dir: &amp;Path, config: &amp;Config) -&gt; io::Result&lt;u64&gt; {
+    let scanner = Scanner::new(config.clone(), Arc::new(ProgressBar::hidden()));
+    let mut count = 0;
+
+    if config.respect_gitignore {
+        // Use ignore crate&apos;s Walk to handle .gitignore patterns
+        let mut walker = WalkBuilder::new(dir);
+
+        // Custom gitignore file if specified
+        if let Some(gitignore_path) = &amp;config.gitignore_path {
+            walker.add_custom_ignore_filename(gitignore_path);
+        }
+
+        for entry in walker.build().filter_map(Result::ok) {
+            if entry.file_type().map_or(false, |ft| ft.is_file())
+                &amp;&amp; !scanner.should_ignore(entry.path())
+                &amp;&amp; scanner.should_include(entry.path())
+            {
+                count += 1;
+            }
+        }
+    } else {
+        // Use walkdir without gitignore support
+        for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
+            if entry.file_type().is_file()
+                &amp;&amp; !scanner.should_ignore(entry.path())
+                &amp;&amp; scanner.should_include(entry.path())
+            {
+                count += 1;
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+/// Format a human-readable file size
+pub fn format_file_size(size: u64) -&gt; String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if size &gt;= GB {
+        format!(&quot;{:.2} GB&quot;, size as f64 / GB as f64)
+    } else if size &gt;= MB {
+        format!(&quot;{:.2} MB&quot;, size as f64 / MB as f64)
+    } else if size &gt;= KB {
+        format!(&quot;{:.2} KB&quot;, size as f64 / KB as f64)
+    } else {
+        format!(&quot;{} bytes&quot;, size)
+    }
+}
+
+/// Default patterns to ignore
+pub static DEFAULT_IGNORE: Lazy&lt;Vec&lt;&amp;&apos;static str&gt;&gt; = Lazy::new(|| {
+    vec![
+        // Version Control
+        &quot;.git&quot;,
+        &quot;.svn&quot;,
+        &quot;.hg&quot;,
+        &quot;.bzr&quot;,
+        &quot;.gitignore&quot;,
+        &quot;.gitattributes&quot;,
+        // OS Files
+        &quot;.DS_Store&quot;,
+        &quot;Thumbs.db&quot;,
+        &quot;desktop.ini&quot;,
+        &quot;ehthumbs.db&quot;,
+        &quot;*.lnk&quot;,
+        &quot;*.url&quot;,
+        &quot;.directory&quot;,
+        // Dependencies
+        &quot;node_modules&quot;,
+        &quot;bower_components&quot;,
+        &quot;.npm&quot;,
+        &quot;package-lock.json&quot;,
+        &quot;yarn.lock&quot;,
+        &quot;.yarn&quot;,
+        &quot;vendor&quot;,
+        &quot;composer.lock&quot;,
+        &quot;.pnpm-store&quot;,
+        // Build &amp; Dist
+        &quot;dist&quot;,
+        &quot;build&quot;,
+        &quot;out&quot;,
+        &quot;bin&quot;,
+        &quot;release&quot;,
+        &quot;*.min.js&quot;,
+        &quot;*.min.css&quot;,
+        &quot;bundle.*&quot;,
+        // Python
+        &quot;__pycache__&quot;,
+        &quot;.pytest_cache&quot;,
+        &quot;.coverage&quot;,
+        &quot;venv&quot;,
+        &quot;env&quot;,
+        &quot;.env&quot;,
+        &quot;.venv&quot;,
+        &quot;*.pyc&quot;,
+        &quot;*.pyo&quot;,
+        &quot;*.pyd&quot;,
+        &quot;.python-version&quot;,
+        &quot;*.egg-info&quot;,
+        &quot;*.egg&quot;,
+        &quot;develop-eggs&quot;,
+        // Rust
+        &quot;target&quot;,
+        &quot;Cargo.lock&quot;,
+        &quot;.cargo&quot;,
+        // IDEs &amp; Editors
+        &quot;.idea&quot;,
+        &quot;.vscode&quot;,
+        &quot;.vs&quot;,
+        &quot;.sublime-*&quot;,
+        &quot;*.swp&quot;,
+        &quot;*.swo&quot;,
+        &quot;*~&quot;,
+        &quot;.project&quot;,
+        &quot;.settings&quot;,
+        &quot;.classpath&quot;,
+        &quot;.factorypath&quot;,
+        &quot;*.iml&quot;,
+        &quot;*.iws&quot;,
+        &quot;*.ipr&quot;,
+        // Caches &amp; Temp
+        &quot;.cache&quot;,
+        &quot;tmp&quot;,
+        &quot;temp&quot;,
+        &quot;logs&quot;,
+        &quot;.sass-cache&quot;,
+        &quot;.eslintcache&quot;,
+        &quot;*.log&quot;,
+        &quot;npm-debug.log*&quot;,
+        &quot;yarn-debug.log*&quot;,
+        &quot;yarn-error.log*&quot;,
+        // Other Build Tools
+        &quot;.gradle&quot;,
+        &quot;gradle&quot;,
+        &quot;.maven&quot;,
+        &quot;.m2&quot;,
+        &quot;*.class&quot;,
+        &quot;*.jar&quot;,
+        &quot;*.war&quot;,
+        &quot;*.ear&quot;,
+        // JavaScript/TypeScript
+        &quot;coverage&quot;,
+        &quot;.nyc_output&quot;,
+        &quot;.next&quot;,
+        &quot;*.tsbuildinfo&quot;,
+        &quot;.nuxt&quot;,
+        &quot;.output&quot;,
+        // .NET
+        &quot;bin&quot;,
+        &quot;obj&quot;,
+        &quot;Debug&quot;,
+        &quot;Release&quot;,
+        &quot;packages&quot;,
+        &quot;*.suo&quot;,
+        &quot;*.user&quot;,
+        &quot;*.pubxml&quot;,
+        &quot;*.pubxml.user&quot;,
+        // Documentation
+        &quot;_site&quot;,
+        &quot;.jekyll-cache&quot;,
+        &quot;.docusaurus&quot;,
+        // Mobile Development
+        &quot;.gradle&quot;,
+        &quot;build&quot;,
+        &quot;xcuserdata&quot;,
+        &quot;*.xcworkspace&quot;,
+        &quot;Pods/&quot;,
+        &quot;.expo&quot;,
+        // Database
+        &quot;*.sqlite&quot;,
+        &quot;*.sqlite3&quot;,
+        &quot;*.db&quot;,
+        // Archives
+        &quot;*.zip&quot;,
+        &quot;*.tar.gz&quot;,
+        &quot;*.tgz&quot;,
+        &quot;*.rar&quot;,
+        // Kubernetes
+        &quot;.kube&quot;,
+        &quot;*.kubeconfig&quot;,
+        // Terraform
+        &quot;.terraform&quot;,
+        &quot;*.tfstate&quot;,
+        &quot;*.tfvars&quot;,
+        // Ansible
+        &quot;*.retry&quot;,
+    ]
+});
+</content>
+          </file>
+          <file name="writer.rs" path="/home/user/projs/dumpfs/src/writer.rs">
+            <metadata>
+              <size>9273</size>
+              <modified>2025-03-27T22:14:42.620872051+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * XML writer implementation for DumpFS
+ */
+
+use std::fs::File;
+use std::io::{self, BufWriter, Write};
+
+use chrono::Local;
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::Writer;
+
+use crate::config::Config;
+use crate::git::GitHost;
+use crate::types::{BinaryNode, DirectoryNode, FileNode, Metadata, Node, SymlinkNode};
+
+/// XML writer for directory contents
+pub struct XmlWriter {
+    /// Writer configuration
+    config: Config,
+}
+
+impl XmlWriter {
+    /// Create a new XML writer
+    pub fn new(config: Config) -&gt; Self {
+        Self { config }
+    }
+
+    /// Write the directory tree to an XML file
+    pub fn write(&amp;self, root_node: &amp;DirectoryNode) -&gt; io::Result&lt;()&gt; {
+        let file = File::create(&amp;self.config.output_file)?;
+        let writer = BufWriter::new(file);
+        let mut xml_writer = Writer::new_with_indent(writer, b&apos; &apos;, 2);
+
+        // Write XML declaration
+        xml_writer.write_event(Event::Decl(BytesDecl::new(&quot;1.0&quot;, Some(&quot;UTF-8&quot;), None)))?;
+
+        // Start directory_scan element with timestamp
+        let mut start_tag = BytesStart::new(&quot;directory_scan&quot;);
+        let timestamp = Local::now().to_rfc3339();
+        start_tag.push_attribute((&quot;timestamp&quot;, timestamp.as_str()));
+        xml_writer.write_event(Event::Start(start_tag))?;
+
+        // Write system info
+        self.write_system_info(&amp;mut xml_writer)?;
+
+        // Write directory structure
+        self.write_directory(root_node, &amp;mut xml_writer)?;
+
+        // End directory_scan element
+        xml_writer.write_event(Event::End(BytesEnd::new(&quot;directory_scan&quot;)))?;
+
+        Ok(())
+    }
+
+    /// Write system information to XML
+    fn write_system_info&lt;W: Write&gt;(&amp;self, writer: &amp;mut Writer&lt;W&gt;) -&gt; io::Result&lt;()&gt; {
+        writer.write_event(Event::Start(BytesStart::new(&quot;system_info&quot;)))?;
+
+        // Write hostname
+        writer.write_event(Event::Start(BytesStart::new(&quot;hostname&quot;)))?;
+        let hostname = hostname::get()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|_| &quot;unknown&quot;.to_string());
+        writer.write_event(Event::Text(BytesText::new(&amp;hostname)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;hostname&quot;)))?;
+
+        // Write OS
+        writer.write_event(Event::Start(BytesStart::new(&quot;os&quot;)))?;
+        let os = std::env::consts::OS;
+        writer.write_event(Event::Text(BytesText::new(os)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;os&quot;)))?;
+
+        // Write kernel version
+        writer.write_event(Event::Start(BytesStart::new(&quot;kernel&quot;)))?;
+        let kernel = std::env::consts::FAMILY;
+        writer.write_event(Event::Text(BytesText::new(kernel)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;kernel&quot;)))?;
+
+        // Write Git repository information if available
+        if let Some(git_repo) = &amp;self.config.git_repo {
+            writer.write_event(Event::Start(BytesStart::new(&quot;git_repository&quot;)))?;
+
+            // Write URL
+            writer.write_event(Event::Start(BytesStart::new(&quot;url&quot;)))?;
+            writer.write_event(Event::Text(BytesText::new(&amp;git_repo.url)))?;
+            writer.write_event(Event::End(BytesEnd::new(&quot;url&quot;)))?;
+
+            // Write host
+            writer.write_event(Event::Start(BytesStart::new(&quot;host&quot;)))?;
+            let host_name = match &amp;git_repo.host {
+                GitHost::GitHub =&gt; &quot;github.com&quot;,
+                GitHost::GitLab =&gt; &quot;gitlab.com&quot;,
+                GitHost::Bitbucket =&gt; &quot;bitbucket.org&quot;,
+                GitHost::Other(name) =&gt; name,
+            };
+            writer.write_event(Event::Text(BytesText::new(host_name)))?;
+            writer.write_event(Event::End(BytesEnd::new(&quot;host&quot;)))?;
+
+            // Write owner
+            writer.write_event(Event::Start(BytesStart::new(&quot;owner&quot;)))?;
+            writer.write_event(Event::Text(BytesText::new(&amp;git_repo.owner)))?;
+            writer.write_event(Event::End(BytesEnd::new(&quot;owner&quot;)))?;
+
+            // Write repository name
+            writer.write_event(Event::Start(BytesStart::new(&quot;name&quot;)))?;
+            writer.write_event(Event::Text(BytesText::new(&amp;git_repo.name)))?;
+            writer.write_event(Event::End(BytesEnd::new(&quot;name&quot;)))?;
+
+            writer.write_event(Event::End(BytesEnd::new(&quot;git_repository&quot;)))?;
+        }
+
+        writer.write_event(Event::End(BytesEnd::new(&quot;system_info&quot;)))?;
+
+        Ok(())
+    }
+
+    /// Write a directory node to XML
+    fn write_directory&lt;W: Write&gt;(
+        &amp;self,
+        dir: &amp;DirectoryNode,
+        writer: &amp;mut Writer&lt;W&gt;,
+    ) -&gt; io::Result&lt;()&gt; {
+        let mut start_tag = BytesStart::new(&quot;directory&quot;);
+        start_tag.push_attribute((&quot;name&quot;, dir.name.as_str()));
+        start_tag.push_attribute((&quot;path&quot;, dir.path.to_string_lossy().as_ref()));
+        writer.write_event(Event::Start(start_tag))?;
+
+        // Write metadata
+        self.write_metadata(&amp;dir.metadata, writer)?;
+
+        // Write contents
+        writer.write_event(Event::Start(BytesStart::new(&quot;contents&quot;)))?;
+
+        for node in &amp;dir.contents {
+            match node {
+                Node::Directory(dir_node) =&gt; self.write_directory(dir_node, writer)?,
+                Node::File(file_node) =&gt; self.write_file(file_node, writer)?,
+                Node::Binary(bin_node) =&gt; self.write_binary(bin_node, writer)?,
+                Node::Symlink(sym_node) =&gt; self.write_symlink(sym_node, writer)?,
+            }
+        }
+
+        writer.write_event(Event::End(BytesEnd::new(&quot;contents&quot;)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;directory&quot;)))?;
+
+        Ok(())
+    }
+
+    /// Write a file node to XML
+    fn write_file&lt;W: Write&gt;(&amp;self, file: &amp;FileNode, writer: &amp;mut Writer&lt;W&gt;) -&gt; io::Result&lt;()&gt; {
+        let mut start_tag = BytesStart::new(&quot;file&quot;);
+        start_tag.push_attribute((&quot;name&quot;, file.name.as_str()));
+        start_tag.push_attribute((&quot;path&quot;, file.path.to_string_lossy().as_ref()));
+        writer.write_event(Event::Start(start_tag))?;
+
+        // Write metadata
+        self.write_metadata(&amp;file.metadata, writer)?;
+
+        // Write content
+        writer.write_event(Event::Start(BytesStart::new(&quot;content&quot;)))?;
+        if let Some(content) = &amp;file.content {
+            // Split content into chunks and write as text events to avoid XML parsing issues
+            for chunk in content.as_bytes().chunks(4096) {
+                if let Ok(text) = std::str::from_utf8(chunk) {
+                    writer.write_event(Event::Text(BytesText::new(text)))?;
+                }
+            }
+        }
+        writer.write_event(Event::End(BytesEnd::new(&quot;content&quot;)))?;
+
+        writer.write_event(Event::End(BytesEnd::new(&quot;file&quot;)))?;
+
+        Ok(())
+    }
+
+    /// Write a binary file node to XML
+    fn write_binary&lt;W: Write&gt;(
+        &amp;self,
+        binary: &amp;BinaryNode,
+        writer: &amp;mut Writer&lt;W&gt;,
+    ) -&gt; io::Result&lt;()&gt; {
+        let mut start_tag = BytesStart::new(&quot;binary&quot;);
+        start_tag.push_attribute((&quot;name&quot;, binary.name.as_str()));
+        start_tag.push_attribute((&quot;path&quot;, binary.path.to_string_lossy().as_ref()));
+        writer.write_event(Event::Start(start_tag))?;
+
+        // Write metadata
+        self.write_metadata(&amp;binary.metadata, writer)?;
+
+        writer.write_event(Event::End(BytesEnd::new(&quot;binary&quot;)))?;
+
+        Ok(())
+    }
+
+    /// Write a symlink node to XML
+    fn write_symlink&lt;W: Write&gt;(
+        &amp;self,
+        symlink: &amp;SymlinkNode,
+        writer: &amp;mut Writer&lt;W&gt;,
+    ) -&gt; io::Result&lt;()&gt; {
+        let mut start_tag = BytesStart::new(&quot;symlink&quot;);
+        start_tag.push_attribute((&quot;name&quot;, symlink.name.as_str()));
+        start_tag.push_attribute((&quot;path&quot;, symlink.path.to_string_lossy().as_ref()));
+        writer.write_event(Event::Start(start_tag))?;
+
+        // Write metadata
+        self.write_metadata(&amp;symlink.metadata, writer)?;
+
+        // Write target
+        writer.write_event(Event::Start(BytesStart::new(&quot;target&quot;)))?;
+        writer.write_event(Event::Text(BytesText::new(&amp;symlink.target)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;target&quot;)))?;
+
+        writer.write_event(Event::End(BytesEnd::new(&quot;symlink&quot;)))?;
+
+        Ok(())
+    }
+
+    /// Write metadata to XML
+    fn write_metadata&lt;W: Write&gt;(
+        &amp;self,
+        metadata: &amp;Metadata,
+        writer: &amp;mut Writer&lt;W&gt;,
+    ) -&gt; io::Result&lt;()&gt; {
+        writer.write_event(Event::Start(BytesStart::new(&quot;metadata&quot;)))?;
+
+        // Write size
+        writer.write_event(Event::Start(BytesStart::new(&quot;size&quot;)))?;
+        writer.write_event(Event::Text(BytesText::new(&amp;metadata.size.to_string())))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;size&quot;)))?;
+
+        // Write modified time
+        writer.write_event(Event::Start(BytesStart::new(&quot;modified&quot;)))?;
+        let modified = chrono::DateTime::&lt;chrono::Local&gt;::from(metadata.modified).to_rfc3339();
+        writer.write_event(Event::Text(BytesText::new(&amp;modified)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;modified&quot;)))?;
+
+        // Write permissions
+        writer.write_event(Event::Start(BytesStart::new(&quot;permissions&quot;)))?;
+        writer.write_event(Event::Text(BytesText::new(&amp;metadata.permissions)))?;
+        writer.write_event(Event::End(BytesEnd::new(&quot;permissions&quot;)))?;
+
+        writer.write_event(Event::End(BytesEnd::new(&quot;metadata&quot;)))?;
+
+        Ok(())
+    }
+}
+</content>
+          </file>
+          <file name="config.rs" path="/home/user/projs/dumpfs/src/config.rs">
+            <metadata>
+              <size>5919</size>
+              <modified>2025-03-27T22:14:42.600872087+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Configuration handling for DumpFS
+ */
+
+use std::io;
+use std::path::PathBuf;
+
+use clap::{Parser, ValueEnum};
+use clap_complete::Shell;
+
+use crate::git;
+use crate::tokenizer::Model;
+
+/// Policy for handling Git repository caching
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum GitCachePolicy {
+    /// Always pull latest changes for existing repositories (default)
+    AlwaysPull,
+    /// Delete and re-clone existing repositories
+    ForceClone,
+    /// Use cached repositories without pulling updates
+    UseCache,
+}
+
+impl Default for GitCachePolicy {
+    fn default() -&gt; Self {
+        Self::AlwaysPull
+    }
+}
+
+/// Command-line arguments for DumpFS
+#[derive(Parser, Debug, Clone)]
+#[clap(
+    name = &quot;dumpfs&quot;,
+    version = env!(&quot;CARGO_PKG_VERSION&quot;),
+    about = &quot;Generate XML representation of directory contents for LLM context&quot;,
+    long_about = &quot;Creates an XML representation of a directory structure and its contents, designed for providing context to Large Language Models (LLMs).&quot;
+)]
+pub struct Args {
+    /// Target directory or Git repository URL to process
+    #[clap(default_value = &quot;.&quot;)]
+    pub directory_path: String,
+
+    /// Output XML file name
+    #[clap(default_value = &quot;.dumpfs.context.xml&quot;)]
+    pub output_file: String,
+
+    /// Comma-separated list of patterns to ignore
+    #[clap(long, value_delimiter = &apos;,&apos;)]
+    pub ignore_patterns: Vec&lt;String&gt;,
+
+    /// Comma-separated list of patterns to include (if specified, only matching files are included)
+    #[clap(long, value_delimiter = &apos;,&apos;)]
+    pub include_patterns: Vec&lt;String&gt;,
+
+    /// Number of threads to use for processing
+    #[clap(long, default_value = &quot;4&quot;)]
+    pub threads: usize,
+
+    /// Respect .gitignore files (default: true)
+    #[clap(long, default_value = &quot;true&quot;)]
+    pub respect_gitignore: bool,
+
+    /// Path to custom .gitignore file
+    #[clap(long)]
+    pub gitignore_path: Option&lt;String&gt;,
+
+    /// LLM model to use for tokenization (enables token counting)
+    #[clap(long, value_enum)]
+    pub model: Option&lt;Model&gt;,
+
+    /// Generate shell completions
+    #[clap(long = &quot;generate&quot;, value_enum)]
+    pub generate: Option&lt;Shell&gt;,
+
+    /// Clean Git repository cache (specify number of days, 0 for all)
+    #[clap(long, value_name = &quot;DAYS&quot;)]
+    pub clean_cache: Option&lt;u64&gt;,
+
+    /// Policy for handling Git repository caching
+    #[clap(long, value_enum, default_value_t = GitCachePolicy::default())]
+    pub git_cache_policy: GitCachePolicy,
+}
+
+/// Application configuration
+#[derive(Clone, Debug)]
+pub struct Config {
+    /// Target directory to process
+    pub target_dir: PathBuf,
+
+    /// Output XML file path
+    pub output_file: PathBuf,
+
+    /// Patterns to ignore
+    pub ignore_patterns: Vec&lt;String&gt;,
+
+    /// Patterns to include (if empty, include all)
+    pub include_patterns: Vec&lt;String&gt;,
+
+    /// Number of threads to use for processing
+    pub num_threads: usize,
+
+    /// Whether to respect .gitignore files
+    pub respect_gitignore: bool,
+
+    /// Path to custom .gitignore file
+    pub gitignore_path: Option&lt;PathBuf&gt;,
+
+    /// LLM model to use for tokenization
+    pub model: Option&lt;Model&gt;,
+
+    /// Original repository URL (if applicable)
+    pub repo_url: Option&lt;String&gt;,
+
+    /// Git repository information (if applicable)
+    pub git_repo: Option&lt;git::GitRepoInfo&gt;,
+
+    /// Policy for handling Git repository caching
+    pub git_cache_policy: GitCachePolicy,
+}
+
+impl Config {
+    /// Create configuration from command-line arguments
+    pub fn from_args(args: Args) -&gt; Self {
+        Self {
+            target_dir: PathBuf::from(args.directory_path.clone()),
+            output_file: PathBuf::from(args.output_file),
+            ignore_patterns: args.ignore_patterns,
+            include_patterns: args.include_patterns,
+            num_threads: args.threads,
+            respect_gitignore: args.respect_gitignore,
+            gitignore_path: args.gitignore_path.map(PathBuf::from),
+            model: args.model,
+            repo_url: None,
+            git_repo: None,
+            git_cache_policy: args.git_cache_policy,
+        }
+    }
+
+    /// Validate the configuration
+    pub fn validate(&amp;self) -&gt; io::Result&lt;()&gt; {
+        // For Git repositories, we&apos;ve already validated during cloning
+        if self.repo_url.is_some() &amp;&amp; self.git_repo.is_some() {
+            // Check if the cloned directory exists and is readable
+            if !self.target_dir.exists() || !self.target_dir.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(
+                        &quot;Cloned repository directory not found: {}&quot;,
+                        self.target_dir.display()
+                    ),
+                ));
+            }
+        } else {
+            // For local directories, check if target directory exists and is readable
+            if !self.target_dir.exists() || !self.target_dir.is_dir() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(&quot;Target directory not found: {}&quot;, self.target_dir.display()),
+                ));
+            }
+        }
+
+        // Check if output file directory exists and is writable
+        if let Some(parent) = self.output_file.parent() {
+            if !parent.exists() &amp;&amp; parent != PathBuf::from(&quot;&quot;) {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(&quot;Output directory not found: {}&quot;, parent.display()),
+                ));
+            }
+        }
+
+        // Check if custom gitignore file exists
+        if let Some(path) = &amp;self.gitignore_path {
+            if !path.exists() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(&quot;Custom .gitignore file not found: {}&quot;, path.display()),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+</content>
+          </file>
+          <file name="lib.rs" path="/home/user/projs/dumpfs/src/lib.rs">
+            <metadata>
+              <size>819</size>
+              <modified>2025-03-27T19:56:57.179696789+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * DumpFS - Generate XML representation of directory contents for LLM context
+ *
+ * This library creates structured XML representations of directory contents
+ * for use as context for Large Language Models.
+ */
+
+pub mod config;
+pub mod git;
+pub mod report;
+pub mod scanner;
+pub mod tokenizer;
+pub mod types;
+pub mod utils;
+pub mod writer;
+
+#[cfg(test)]
+mod tests;
+
+// Re-export main components for easier access
+pub use config::Config;
+pub use report::{FileReportInfo, ReportFormat, Reporter, ScanReport};
+pub use scanner::Scanner;
+pub use types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
+pub use utils::{count_files, format_file_size};
+pub use writer::XmlWriter;
+
+// No process_path export needed
+
+/// Version of the library
+pub const VERSION: &amp;str = env!(&quot;CARGO_PKG_VERSION&quot;);
+</content>
+          </file>
+          <file name="main.rs" path="/home/user/projs/dumpfs/src/main.rs">
+            <metadata>
+              <size>13731</size>
+              <modified>2025-03-27T22:27:17.652102816+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Command-line interface for DumpFS
+ */
+
+use std::io;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Instant;
+
+use clap::{CommandFactory, Parser};
+use clap_complete::{generate, CompleteEnv, Shell};
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::ThreadPoolBuilder;
+
+use dumpfs::config::{Args, Config, GitCachePolicy};
+use dumpfs::git::{self, GitRepoInfo};
+use dumpfs::report::{ReportFormat, Reporter, ScanReport};
+use dumpfs::scanner::Scanner;
+use dumpfs::utils::count_files;
+use dumpfs::writer::XmlWriter;
+
+/// Generate shell completions
+fn print_completions(generator: Shell, cmd: &amp;mut clap::Command) {
+    generate(
+        generator,
+        cmd,
+        cmd.get_name().to_string(),
+        &amp;mut io::stdout(),
+    );
+}
+
+/// Process a path that could be a local directory or a Git repository URL
+///
+/// Arguments:
+/// - path: The path or URL to process
+/// - git_cache_policy: Policy for handling Git repository caching
+/// - progress: Optional progress bar for reporting (will create one if None)
+///
+/// Returns:
+/// - The target directory path (local or cloned repo)
+/// - Optional repository information if it&apos;s a Git URL
+fn process_path(
+    path: &amp;str,
+    git_cache_policy: GitCachePolicy,
+    progress: Option&lt;&amp;ProgressBar&gt;,
+) -&gt; io::Result&lt;(PathBuf, Option&lt;String&gt;, Option&lt;GitRepoInfo&gt;)&gt; {
+    // If not a Git URL, just return the path as is
+    if !git::is_git_url(path) {
+        return Ok((PathBuf::from(path), None, None));
+    }
+
+    // Parse the Git URL
+    let repo_info = match git::parse_git_url(path) {
+        Ok(info) =&gt; info,
+        Err(e) =&gt; return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),
+    };
+
+    // Create a progress reporter adapter
+    struct ProgressBarAdapter&lt;&apos;a&gt; {
+        bar: &amp;&apos;a ProgressBar,
+        repo_info: &amp;&apos;a GitRepoInfo,
+        is_clone: bool,
+    }
+
+    impl&lt;&apos;a&gt; git::ProgressReporter for ProgressBarAdapter&lt;&apos;a&gt; {
+        fn report(&amp;self, git_progress: &amp;git::GitProgress) {
+            let percent = git_progress.percentage();
+
+            // Format progress message
+            let action = if self.is_clone { &quot;Cloning&quot; } else { &quot;Updating&quot; };
+            let msg = format!(
+                &quot;{} {}/{} ({}/{}), {} downloaded&quot;,
+                action,
+                self.repo_info.owner,
+                self.repo_info.name,
+                git_progress.received_objects,
+                git_progress.total_objects,
+                git_progress.formatted_bytes()
+            );
+
+            self.bar.set_message(msg);
+            self.bar.set_position(percent as u64);
+        }
+    }
+
+    // Use the provided progress bar or create a new one
+    let progress_bar = match progress {
+        Some(p) =&gt; p,
+        None =&gt; {
+            // Create a new progress bar if none is provided
+            let new_bar = ProgressBar::new(100);
+            new_bar.set_style(ProgressStyle::default_bar()
+                .template(&quot;{spinner:.green} {prefix:.bold.cyan} {msg} [{bar:40.cyan/blue}] {percent}%&quot;)
+                .unwrap());
+
+            // Since this is a temporary variable, we&apos;ll just leak it to avoid ownership issues
+            Box::leak(Box::new(new_bar))
+        }
+    };
+
+    // Check if repository already exists
+    let repo_exists = git::Repository::exists(&amp;repo_info);
+
+    // Handle based on policy
+    match (git_cache_policy, repo_exists) {
+        // Repository doesn&apos;t exist, always clone
+        (_, false) =&gt; {
+            progress_bar.set_prefix(&quot;🔄 Cloning&quot;);
+            progress_bar.set_message(format!(
+                &quot;Cloning repository: {}/{}&quot;,
+                repo_info.owner, repo_info.name
+            ));
+
+            let reporter = ProgressBarAdapter {
+                bar: progress_bar,
+                repo_info: &amp;repo_info,
+                is_clone: true,
+            };
+
+            match git::Repository::clone(repo_info.clone(), Some(&amp;reporter)) {
+                Ok(repo) =&gt; {
+                    progress_bar.finish_with_message(format!(
+                        &quot;Repository cloned: {}/{}&quot;,
+                        repo_info.owner, repo_info.name
+                    ));
+
+                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+                }
+                Err(e) =&gt; {
+                    progress_bar.abandon_with_message(format!(&quot;Failed to clone repository: {}&quot;, e));
+                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                }
+            }
+        }
+
+        // Force clone even if exists
+        (GitCachePolicy::ForceClone, true) =&gt; {
+            // Delete existing repo
+            progress_bar.set_prefix(&quot;🗑️ Removing&quot;);
+            progress_bar.set_message(format!(
+                &quot;Removing existing repository: {}/{}&quot;,
+                repo_info.owner, repo_info.name
+            ));
+
+            // Remove the directory to force a fresh clone
+            if let Err(e) = std::fs::remove_dir_all(&amp;repo_info.cache_path) {
+                progress_bar
+                    .abandon_with_message(format!(&quot;Failed to remove existing repository: {}&quot;, e));
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(&quot;Failed to remove directory: {}&quot;, e),
+                ));
+            }
+
+            // Clone the repository
+            progress_bar.set_prefix(&quot;🔄 Cloning&quot;);
+            progress_bar.set_message(format!(
+                &quot;Cloning repository: {}/{}&quot;,
+                repo_info.owner, repo_info.name
+            ));
+
+            let reporter = ProgressBarAdapter {
+                bar: progress_bar,
+                repo_info: &amp;repo_info,
+                is_clone: true,
+            };
+
+            match git::Repository::clone(repo_info.clone(), Some(&amp;reporter)) {
+                Ok(repo) =&gt; {
+                    progress_bar.finish_with_message(format!(
+                        &quot;Repository cloned: {}/{}&quot;,
+                        repo_info.owner, repo_info.name
+                    ));
+
+                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+                }
+                Err(e) =&gt; {
+                    progress_bar.abandon_with_message(format!(&quot;Failed to clone repository: {}&quot;, e));
+                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                }
+            }
+        }
+
+        // Pull if exists
+        (GitCachePolicy::AlwaysPull, true) =&gt; {
+            progress_bar.set_prefix(&quot;🔄 Updating&quot;);
+            progress_bar.set_message(format!(
+                &quot;Updating repository: {}/{}&quot;,
+                repo_info.owner, repo_info.name
+            ));
+
+            let reporter = ProgressBarAdapter {
+                bar: progress_bar,
+                repo_info: &amp;repo_info,
+                is_clone: false,
+            };
+
+            match git::Repository::open(repo_info.clone()) {
+                Ok(mut repo) =&gt; {
+                    if let Err(e) = repo.pull(Some(&amp;reporter)) {
+                        progress_bar
+                            .abandon_with_message(format!(&quot;Failed to update repository: {}&quot;, e));
+                        return Err(io::Error::new(io::ErrorKind::Other, e.to_string()));
+                    }
+
+                    progress_bar.finish_with_message(format!(
+                        &quot;Repository updated: {}/{}&quot;,
+                        repo_info.owner, repo_info.name
+                    ));
+
+                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+                }
+                Err(e) =&gt; {
+                    progress_bar.abandon_with_message(format!(&quot;Failed to open repository: {}&quot;, e));
+                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                }
+            }
+        }
+
+        // Use cache without pulling
+        (GitCachePolicy::UseCache, true) =&gt; {
+            progress_bar.set_prefix(&quot;📂 Using cached&quot;);
+            progress_bar.set_message(format!(
+                &quot;Using cached repository: {}/{}&quot;,
+                repo_info.owner, repo_info.name
+            ));
+
+            progress_bar.finish_with_message(format!(
+                &quot;Using cached repository: {}/{}&quot;,
+                repo_info.owner, repo_info.name
+            ));
+
+            Ok((
+                repo_info.cache_path.clone(),
+                Some(path.to_string()),
+                Some(repo_info),
+            ))
+        }
+    }
+}
+
+fn main() -&gt; io::Result&lt;()&gt; {
+    // Enable automatic shell completion
+    CompleteEnv::with_factory(Args::command).complete();
+
+    // Parse command line arguments
+    let args = Args::parse();
+
+    // Handle completions if requested
+    if let Some(generator) = args.generate {
+        let mut cmd = Args::command();
+        eprintln!(&quot;Generating completion file for {generator:?}...&quot;);
+        print_completions(generator, &amp;mut cmd);
+        return Ok(());
+    }
+
+    // Handle cache cleaning if requested
+    if let Some(days) = args.clean_cache {
+        eprintln!(
+            &quot;Cleaning Git repository cache (older than {} days)...&quot;,
+            days
+        );
+        match git::clean_cache(days) {
+            Ok(count) =&gt; {
+                eprintln!(&quot;Removed {} repositories from cache&quot;, count);
+                return Ok(());
+            }
+            Err(e) =&gt; {
+                eprintln!(&quot;Error cleaning cache: {}&quot;, e);
+                return Err(e);
+            }
+        }
+    }
+
+    // Create progress bar with advanced Unicode styling
+    let progress = ProgressBar::new(0);
+    progress.set_style(ProgressStyle::default_bar()
+        .template(&quot;{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white} {pos}/{len} ({percent}%) ⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s&quot;)
+        .unwrap());
+    progress.enable_steady_tick(std::time::Duration::from_millis(100));
+    progress.set_prefix(&quot;📊 Setup&quot;);
+
+    // Create initial configuration
+    let mut config = Config::from_args(args.clone());
+
+    // Process path (either local directory or git repository URL)
+    progress.set_message(format!(&quot;Processing path: {}&quot;, args.directory_path));
+    let (processed_path, repo_url, git_repo) = match process_path(
+        &amp;args.directory_path,
+        config.git_cache_policy,
+        Some(&amp;progress),
+    ) {
+        Ok(result) =&gt; result,
+        Err(e) =&gt; {
+            progress.abandon_with_message(format!(&quot;Error processing path: {}&quot;, e));
+            eprintln!(&quot;Error processing path: {}&quot;, e);
+            return Err(e);
+        }
+    };
+
+    // Update config with processed path and repo info
+    config.target_dir = processed_path;
+    config.repo_url = repo_url;
+    config.git_repo = git_repo;
+
+    // Adjust output file location for git repositories
+    if let Some(repo) = &amp;config.git_repo {
+        // Check if output file is a relative path with no directory component
+        let output_path = PathBuf::from(&amp;args.output_file);
+        if !output_path.is_absolute()
+            &amp;&amp; (output_path.parent().is_none() || output_path.parent().unwrap() == Path::new(&quot;&quot;))
+        {
+            // Use the repository directory for the output file
+            config.output_file = repo.cache_path.join(output_path);
+        }
+    }
+
+    // Validate configuration
+    config.validate()?;
+
+    // Configure thread pool
+    if let Err(e) = ThreadPoolBuilder::new()
+        .num_threads(config.num_threads)
+        .build_global()
+    {
+        eprintln!(&quot;Warning: Failed to set thread pool size: {}&quot;, e);
+    }
+
+    progress.set_message(format!(
+        &quot;📂 Scanning directory: {}&quot;,
+        config.target_dir.display()
+    ));
+
+    // Add gitignore status message
+    if config.respect_gitignore {
+        progress.set_message(match &amp;config.gitignore_path {
+            Some(path) =&gt; format!(&quot;🔍 Using custom gitignore file: {}&quot;, path.display()),
+            None =&gt; &quot;🔍 Respecting .gitignore files in the project&quot;.to_string(),
+        });
+    }
+
+    // Count files for progress tracking
+    let total_files = match count_files(&amp;config.target_dir, &amp;config) {
+        Ok(count) =&gt; {
+            progress.set_message(format!(&quot;🔎 Found {} files to process&quot;, count));
+            count
+        }
+        Err(e) =&gt; {
+            progress.set_message(format!(&quot;⚠️ Warning: Failed to count files: {}&quot;, e));
+            0
+        }
+    };
+
+    progress.set_length(total_files);
+    progress.set_prefix(&quot;📊 Processing&quot;);
+    progress.set_message(&quot;Starting scan...&quot;);
+
+    // Create scanner and writer
+    let scanner = Scanner::new(config.clone(), Arc::new(progress.clone()));
+    let writer = XmlWriter::new(config.clone());
+
+    // Start timing both scan and write operations
+    let start_time = Instant::now();
+
+    // Scan directory
+    let root_node = scanner.scan()?;
+
+    // Write XML output
+    writer.write(&amp;root_node)?;
+
+    // Calculate total duration (scan + write)
+    let total_duration = start_time.elapsed();
+
+    // Clear the progress bar
+    progress.finish_and_clear();
+
+    // Get scanner statistics
+    let scanner_stats = scanner.get_statistics();
+
+    // Prepare the scan report
+    let scan_report = ScanReport {
+        output_file: config.output_file.display().to_string(),
+        duration: total_duration,
+        files_processed: scanner_stats.files_processed,
+        total_lines: scanner_stats.total_lines,
+        total_chars: scanner_stats.total_chars,
+        total_tokens: scanner_stats.total_tokens,
+        file_details: scanner_stats.file_details,
+        token_cache_hits: scanner_stats.token_cache_hits,
+        token_cache_misses: scanner_stats.token_cache_misses,
+    };
+
+    // Create a reporter and print the report
+    let reporter = Reporter::new(ReportFormat::ConsoleTable);
+    reporter.print_report(&amp;scan_report);
+
+    Ok(())
+}
+</content>
+          </file>
+          <file name="report.rs" path="/home/user/projs/dumpfs/src/report.rs">
+            <metadata>
+              <size>9585</size>
+              <modified>2025-03-27T22:14:42.607872074+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Reporting functionality for DumpFS
+ *
+ * Provides functionality for generating formatted reports of scan results
+ * using the tabled library for clean, consistent table rendering.
+ */
+
+use std::collections::HashMap;
+use std::time::Duration;
+
+use tabled::{
+    settings::{object::Columns, Alignment, Modify, Padding, Style},
+    Table, Tabled,
+};
+
+/// Information about a file in the report
+#[derive(Debug, Clone, Default)]
+pub struct FileReportInfo {
+    /// Number of lines in the file
+    pub lines: usize,
+    /// Number of characters in the file
+    pub chars: usize,
+    /// Number of tokens in the file (if tokenizer is enabled)
+    pub tokens: Option&lt;usize&gt;,
+}
+
+/// Statistics for a directory scan
+#[derive(Debug, Clone)]
+pub struct ScanReport {
+    /// Output file path
+    pub output_file: String,
+    /// Time taken to scan
+    pub duration: Duration,
+    /// Number of files processed
+    pub files_processed: usize,
+    /// Total number of lines
+    pub total_lines: usize,
+    /// Total number of characters
+    pub total_chars: usize,
+    /// Total number of tokens (if tokenizer is enabled)
+    pub total_tokens: Option&lt;usize&gt;,
+    /// Details for each file
+    pub file_details: HashMap&lt;String, FileReportInfo&gt;,
+    /// Token cache hits (if tokenizer caching is enabled)
+    pub token_cache_hits: Option&lt;usize&gt;,
+    /// Token cache misses (if tokenizer caching is enabled)
+    pub token_cache_misses: Option&lt;usize&gt;,
+}
+
+/// Format of the report output
+pub enum ReportFormat {
+    /// Console table output
+    ConsoleTable,
+    // Other formats could be added in the future
+    // JSON, HTML, etc.
+}
+
+/// Report generator for scan results
+pub struct Reporter {
+    format: ReportFormat,
+}
+
+impl Reporter {
+    /// Create a new reporter
+    pub fn new(format: ReportFormat) -&gt; Self {
+        Self { format }
+    }
+
+    /// Format a number with human-readable units
+    fn format_number(&amp;self, num: usize) -&gt; String {
+        if num &gt;= 1_000_000 {
+            format!(&quot;{:.1}M&quot;, num as f64 / 1_000_000.0)
+        } else if num &gt;= 1_000 {
+            format!(&quot;{:.1}K&quot;, num as f64 / 1_000.0)
+        } else {
+            num.to_string()
+        }
+    }
+
+    /// Generate a report string based on scan statistics
+    pub fn generate_report(&amp;self, report: &amp;ScanReport) -&gt; String {
+        match self.format {
+            ReportFormat::ConsoleTable =&gt; self.generate_console_report(report),
+            // Additional formats could be added here
+        }
+    }
+
+    /// Print the report to stdout
+    pub fn print_report(&amp;self, report: &amp;ScanReport) {
+        println!(&quot;\n{}&quot;, self.generate_report(report));
+    }
+
+    // Format path to be relative and handle truncation if needed
+    fn format_path(&amp;self, path: &amp;str, max_len: usize) -&gt; String {
+        // Strip leading paths to show only project-relative path
+        let parts: Vec&lt;&amp;str&gt; = path.split(&apos;/&apos;).collect();
+
+        // If the path contains &quot;projs/dumpfs&quot;, extract everything after that
+        let mut rel_path = path.to_string();
+        if let Some(pos) = path.find(&quot;projs/dumpfs&quot;) {
+            if let Some(p) = path.get(pos + &quot;projs/dumpfs&quot;.len() + 1..) {
+                rel_path = p.to_string();
+            }
+        }
+
+        // If relative path is empty, use the original filename
+        if rel_path.is_empty() &amp;&amp; !parts.is_empty() {
+            rel_path = parts.last().unwrap_or(&amp;&quot;&quot;).to_string();
+        }
+
+        // Truncate if too long
+        if rel_path.len() &lt;= max_len {
+            return rel_path;
+        }
+
+        // If too long, preserve the most meaningful part (filename and parent dirs)
+        let parts: Vec&lt;&amp;str&gt; = path.split(&apos;/&apos;).collect();
+        if parts.len() &lt;= 2 {
+            return format!(&quot;...{}&quot;, &amp;path[path.len().saturating_sub(max_len - 3)..]);
+        }
+
+        // Keep the last few segments
+        let mut result = String::new();
+        let mut current_len = 3; // Start with &quot;...&quot;
+        let mut segments = Vec::new();
+
+        for part in parts.iter().rev() {
+            let part_len = part.len() + 1; // +1 for &apos;/&apos;
+            if current_len + part_len &lt;= max_len {
+                segments.push(*part);
+                current_len += part_len;
+            } else {
+                break;
+            }
+        }
+
+        result.push_str(&quot;...&quot;);
+        for part in segments.iter().rev() {
+            result.push(&apos;/&apos;);
+            result.push_str(part);
+        }
+
+        result
+    }
+
+    // Create a summary table using the tabled crate
+    fn create_summary_table(&amp;self, report: &amp;ScanReport) -&gt; String {
+        // Define the summary table data structure
+        #[derive(Tabled)]
+        struct SummaryRow {
+            #[tabled(rename = &quot;Metric&quot;)]
+            key: String,
+
+            #[tabled(rename = &quot;Value&quot;)]
+            value: String,
+        }
+
+        let mut rows = Vec::new();
+
+        // Add rows to the summary table
+        rows.push(SummaryRow {
+            key: &quot;📂 Output File&quot;.to_string(),
+            value: report.output_file.clone(),
+        });
+
+        rows.push(SummaryRow {
+            key: &quot;⏱️ Process Time&quot;.to_string(),
+            value: format!(&quot;{:.4?}&quot;, report.duration),
+        });
+
+        rows.push(SummaryRow {
+            key: &quot;📄 Files Processed&quot;.to_string(),
+            value: self.format_number(report.files_processed),
+        });
+
+        rows.push(SummaryRow {
+            key: &quot;📝 Total Lines&quot;.to_string(),
+            value: self.format_number(report.total_lines),
+        });
+
+        // Use actual token count if available, otherwise use estimate
+        let token_text = if let Some(tokens) = report.total_tokens {
+            format!(&quot;{} tokens (counted)&quot;, self.format_number(tokens))
+        } else {
+            let estimated_tokens = report.total_chars / 4;
+            format!(
+                &quot;{} tokens (estimated)&quot;,
+                self.format_number(estimated_tokens)
+            )
+        };
+
+        rows.push(SummaryRow {
+            key: &quot;📦 LLM Tokens&quot;.to_string(),
+            value: token_text,
+        });
+
+        // Add cache statistics if available
+        if let (Some(hits), Some(misses)) = (report.token_cache_hits, report.token_cache_misses) {
+            let total = hits + misses;
+            let hit_rate = if total &gt; 0 {
+                format!(&quot;{:.1}%&quot;, (hits as f64 / total as f64) * 100.0)
+            } else {
+                &quot;0.0%&quot;.to_string()
+            };
+
+            rows.push(SummaryRow {
+                key: &quot;🔄 Cache Hit Rate&quot;.to_string(),
+                value: format!(&quot;{} ({} hits / {} total)&quot;, hit_rate, hits, total),
+            });
+        }
+
+        // Create and style the table
+        let mut table = Table::new(rows);
+        table
+            .with(Style::rounded())
+            .with(Padding::new(1, 1, 0, 0))
+            .with(Modify::new(Columns::new(..)).with(Alignment::left()));
+
+        table.to_string()
+    }
+
+    // Create a files table using the tabled crate
+    fn create_files_table(&amp;self, report: &amp;ScanReport) -&gt; String {
+        // Define the files table data structure
+        #[derive(Tabled)]
+        struct FileRow {
+            #[tabled(rename = &quot;File Path&quot;)]
+            path: String,
+
+            #[tabled(rename = &quot;Lines&quot;)]
+            lines: String,
+
+            #[tabled(rename = &quot;Est. Tokens&quot;)]
+            tokens: String,
+        }
+
+        // Sort files by character count
+        let mut files: Vec&lt;_&gt; = report.file_details.iter().collect();
+        files.sort_by(|(_, a), (_, b)| b.chars.cmp(&amp;a.chars));
+
+        // Determine if we show all files or just top 10
+        let files_to_show = if report.file_details.len() &gt; 15 {
+            &amp;files[0..10]
+        } else {
+            &amp;files[..]
+        };
+
+        // Generate rows for the table
+        let rows: Vec&lt;FileRow&gt; = files_to_show
+            .iter()
+            .map(|(path, info)| {
+                // Format and truncate path if needed
+                let display_path = self.format_path(path, 60);
+
+                // Use actual token count if available, otherwise estimate
+                let token_count = if let Some(tokens) = info.tokens {
+                    self.format_number(tokens)
+                } else {
+                    let estimated_tokens = info.chars / 4;
+                    self.format_number(estimated_tokens)
+                };
+
+                FileRow {
+                    path: display_path,
+                    lines: self.format_number(info.lines),
+                    tokens: token_count,
+                }
+            })
+            .collect();
+
+        // Create and style the table
+        let mut table = Table::new(rows);
+        table
+            .with(Style::rounded())
+            .with(Padding::new(1, 1, 0, 0))
+            .with(Modify::new(Columns::new(..)).with(Alignment::left()));
+
+        table.to_string()
+    }
+
+    // Generate a console table report
+    fn generate_console_report(&amp;self, report: &amp;ScanReport) -&gt; String {
+        // Generate summary and files tables
+        let summary_table = self.create_summary_table(report);
+        let files_table = self.create_files_table(report);
+
+        // Create proper section titles
+        let summary_title = &quot;✅  EXTRACTION COMPLETE&quot;;
+        let files_title = if report.file_details.len() &gt; 15 {
+            &quot;📋  TOP 10 LARGEST FILES BY CHARACTER COUNT  📋&quot;
+        } else {
+            &quot;📋  PROCESSED FILES&quot;
+        };
+
+        // Combine them with appropriate spacing and titles, but put files first
+        format!(
+            &quot;{}\n{}\n\n{}\n{}&quot;,
+            files_title, files_table, summary_title, summary_table
+        )
+    }
+}
+</content>
+          </file>
+          <file name="tests.rs" path="/home/user/projs/dumpfs/src/tests.rs">
+            <metadata>
+              <size>12914</size>
+              <modified>2025-03-27T22:09:19.438647039+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Tests for DumpFS functionality
+ */
+
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use indicatif::ProgressBar;
+use quick_xml::events::Event;
+use quick_xml::Reader;
+use tempfile::tempdir;
+
+use crate::config::{Config, GitCachePolicy};
+use crate::git::{GitHost, GitRepoInfo};
+// Git module imports not needed as tests are moved
+use crate::scanner::Scanner;
+use crate::writer::XmlWriter;
+
+// Helper function to create a test directory structure
+fn setup_test_directory() -&gt; io::Result&lt;tempfile::TempDir&gt; {
+    let temp_dir = tempdir()?;
+
+    // Create a simple directory structure
+    fs::create_dir(temp_dir.path().join(&quot;dir1&quot;))?;
+    fs::create_dir(temp_dir.path().join(&quot;dir2&quot;))?;
+    fs::create_dir(temp_dir.path().join(&quot;dir1&quot;).join(&quot;subdir&quot;))?;
+
+    // Create text files
+    let mut file1 = File::create(temp_dir.path().join(&quot;file1.txt&quot;))?;
+    writeln!(file1, &quot;This is a text file with content&quot;)?;
+
+    let mut file2 = File::create(temp_dir.path().join(&quot;dir1&quot;).join(&quot;file2.txt&quot;))?;
+    writeln!(file2, &quot;This is another text file\nwith multiple lines&quot;)?;
+
+    let mut file3 = File::create(
+        temp_dir
+            .path()
+            .join(&quot;dir1&quot;)
+            .join(&quot;subdir&quot;)
+            .join(&quot;file3.txt&quot;),
+    )?;
+    writeln!(file3, &quot;Nested file content&quot;)?;
+
+    // Create files to be ignored
+    fs::create_dir(temp_dir.path().join(&quot;.git&quot;))?;
+    let mut git_file = File::create(temp_dir.path().join(&quot;.git&quot;).join(&quot;config&quot;))?;
+    writeln!(git_file, &quot;[core]\n\trepositoryformatversion = 0&quot;)?;
+
+    // Create a binary file
+    let mut bin_file = File::create(temp_dir.path().join(&quot;binary.bin&quot;))?;
+    bin_file.write_all(&amp;[0u8, 1u8, 2u8, 3u8])?;
+
+    // Create a symlink if not on Windows
+    #[cfg(not(target_os = &quot;windows&quot;))]
+    std::os::unix::fs::symlink(
+        temp_dir.path().join(&quot;file1.txt&quot;),
+        temp_dir.path().join(&quot;symlink.txt&quot;),
+    )?;
+
+    Ok(temp_dir)
+}
+
+// Helper function to create a test directory with a .gitignore file
+fn setup_gitignore_test_directory() -&gt; io::Result&lt;tempfile::TempDir&gt; {
+    let temp_dir = setup_test_directory()?;
+
+    // Create a .gitignore file
+    let mut gitignore = File::create(temp_dir.path().join(&quot;.gitignore&quot;))?;
+    writeln!(gitignore, &quot;# Ignore all .txt files&quot;)?;
+    writeln!(gitignore, &quot;*.txt&quot;)?;
+    writeln!(gitignore, &quot;# Ignore binary.bin&quot;)?;
+    writeln!(gitignore, &quot;binary.bin&quot;)?;
+
+    // Create some additional files that aren&apos;t explicitly ignored
+    let mut not_ignored = File::create(temp_dir.path().join(&quot;not_ignored.md&quot;))?;
+    writeln!(not_ignored, &quot;# This file shouldn&apos;t be ignored&quot;)?;
+
+    Ok(temp_dir)
+}
+
+// Helper function to create a large file (&gt;1MB)
+fn create_large_file(dir: &amp;Path) -&gt; io::Result&lt;()&gt; {
+    let path = dir.join(&quot;large_file.txt&quot;);
+    let mut file = File::create(path)?;
+
+    // Write over 1MB of data
+    let line = &quot;This is a line of text that will be repeated many times to create a large file.\n&quot;;
+    for _ in 0..20000 {
+        file.write_all(line.as_bytes())?;
+    }
+
+    Ok(())
+}
+
+// Test basic scanning functionality
+#[test]
+fn test_basic_scan() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![],
+        num_threads: 1,
+        respect_gitignore: false,
+        gitignore_path: None,
+        model: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Check that the output file exists
+    assert!(output_file.exists());
+
+    // Read the XML file to verify structure
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // Check basic structure
+    assert!(xml_content.contains(&quot;&lt;directory_scan&quot;));
+    assert!(xml_content.contains(&quot;&lt;system_info&gt;&quot;));
+    assert!(xml_content.contains(&quot;&lt;hostname&gt;&quot;));
+    assert!(xml_content.contains(&quot;&lt;directory name=&quot;));
+    assert!(xml_content.contains(&quot;&lt;file name=\&quot;file1.txt\&quot;&quot;));
+    assert!(xml_content.contains(&quot;This is a text file with content&quot;));
+
+    // The .git directory should be ignored by default
+    assert!(!xml_content.contains(&quot;.git&quot;));
+
+    Ok(())
+}
+
+// Test ignore patterns
+#[test]
+fn test_ignore_patterns() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![&quot;*.txt&quot;.to_string()],
+        include_patterns: vec![],
+        num_threads: 1,
+        respect_gitignore: false,
+        model: None,
+        gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Read the XML file
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // All .txt files should be ignored
+    assert!(!xml_content.contains(&quot;file1.txt&quot;));
+    assert!(!xml_content.contains(&quot;file2.txt&quot;));
+    assert!(!xml_content.contains(&quot;file3.txt&quot;));
+
+    // The binary file should still be included
+    assert!(xml_content.contains(&quot;binary.bin&quot;));
+
+    Ok(())
+}
+
+// Test include patterns
+#[test]
+fn test_include_patterns() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![&quot;*.bin&quot;.to_string()],
+        num_threads: 1,
+        respect_gitignore: false,
+        model: None,
+        gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Read the XML file
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // Only .bin files should be included
+    assert!(!xml_content.contains(&quot;file1.txt&quot;));
+    assert!(!xml_content.contains(&quot;file2.txt&quot;));
+    assert!(!xml_content.contains(&quot;file3.txt&quot;));
+    assert!(xml_content.contains(&quot;binary.bin&quot;));
+
+    Ok(())
+}
+
+// Test handling of large files
+#[test]
+fn test_large_file_handling() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    create_large_file(temp_dir.path())?;
+
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![],
+        num_threads: 1,
+        respect_gitignore: false,
+        model: None,
+        gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Read the XML file
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // Large file should be mentioned but content should be truncated
+    assert!(xml_content.contains(&quot;large_file.txt&quot;));
+    assert!(xml_content.contains(&quot;File too large to include content&quot;));
+
+    Ok(())
+}
+
+// Test XML structure validity
+#[test]
+fn test_xml_validity() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![],
+        num_threads: 1,
+        model: None,
+        respect_gitignore: false,
+        gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Parse the XML file to verify it&apos;s well-formed
+    let file_content = fs::read_to_string(&amp;output_file)?;
+    let mut reader = Reader::from_str(&amp;file_content);
+
+    let mut depth = 0;
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&amp;mut buf) {
+            Ok(Event::Start(_)) =&gt; depth += 1,
+            Ok(Event::End(_)) =&gt; depth -= 1,
+            Ok(Event::Eof) =&gt; break,
+            Err(e) =&gt; panic!(&quot;Error parsing XML: {}&quot;, e),
+            _ =&gt; (),
+        }
+        buf.clear();
+    }
+
+    // If XML is well-formed, depth should be 0 at the end
+    assert_eq!(depth, 0, &quot;XML structure is not well-balanced&quot;);
+
+    Ok(())
+}
+
+// Test respecting .gitignore files
+#[test]
+fn test_respect_gitignore() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_gitignore_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![],
+        num_threads: 1,
+        respect_gitignore: true,
+        model: None,
+        gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Read the XML file
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // Files excluded by .gitignore should not be present
+    assert!(!xml_content.contains(&quot;file1.txt&quot;));
+    assert!(!xml_content.contains(&quot;file2.txt&quot;));
+    assert!(!xml_content.contains(&quot;file3.txt&quot;));
+    assert!(!xml_content.contains(&quot;binary.bin&quot;));
+
+    // Files not excluded by .gitignore should be present
+    assert!(xml_content.contains(&quot;not_ignored.md&quot;));
+
+    Ok(())
+}
+
+#[test]
+fn test_output_file_path_for_git_repo() {
+    // Create a mock GitRepoInfo
+    let repo_path = PathBuf::from(&quot;/tmp/cache/dumpfs/github/username/repo&quot;);
+    let git_repo = GitRepoInfo {
+        url: &quot;https://github.com/username/repo&quot;.to_string(),
+        host: GitHost::GitHub,
+        owner: &quot;username&quot;.to_string(),
+        name: &quot;repo&quot;.to_string(),
+        cache_path: repo_path.clone(),
+    };
+
+    // Test cases for output file paths
+    let test_cases = vec![
+        // Relative file with no path component -&gt; save to repo dir
+        (&quot;.dumpfs.context.xml&quot;, repo_path.join(&quot;.dumpfs.context.xml&quot;)),
+        // Relative file with path component -&gt; keep as is
+        (&quot;output/file.xml&quot;, PathBuf::from(&quot;output/file.xml&quot;)),
+        // Absolute path -&gt; keep as is
+        (&quot;/tmp/output.xml&quot;, PathBuf::from(&quot;/tmp/output.xml&quot;)),
+    ];
+
+    for (input, expected) in test_cases {
+        // Create a config with the test input
+        let mut config = Config {
+            target_dir: repo_path.clone(),
+            output_file: PathBuf::from(input),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+            respect_gitignore: false,
+            gitignore_path: None,
+            model: None,
+            repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
+            git_repo: Some(git_repo.clone()),
+            git_cache_policy: GitCachePolicy::AlwaysPull,
+        };
+
+        // Apply output file path logic (simplified from main.rs)
+        if let Some(repo) = &amp;config.git_repo {
+            let output_path = PathBuf::from(input);
+            if !output_path.is_absolute()
+                &amp;&amp; (output_path.parent().is_none()
+                    || output_path.parent().unwrap() == Path::new(&quot;&quot;))
+            {
+                config.output_file = repo.cache_path.join(output_path);
+            }
+        }
+
+        // Check if the path was adjusted correctly
+        assert_eq!(config.output_file, expected);
+    }
+}
+</content>
+          </file>
+          <file name="scanner.rs" path="/home/user/projs/dumpfs/src/scanner.rs">
+            <metadata>
+              <size>26175</size>
+              <modified>2025-03-27T22:41:08.156489598+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Directory and file scanning functionality
+ */
+
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::{self, BufRead, BufReader, Read};
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+use glob_match::glob_match;
+use ignore::{DirEntry as IgnoreDirEntry, WalkBuilder};
+use indicatif::ProgressBar;
+use rayon::prelude::*;
+use walkdir::{DirEntry, WalkDir};
+
+use crate::config::Config;
+use crate::types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
+use crate::utils::{format_file_size, DEFAULT_IGNORE};
+
+use crate::report::FileReportInfo;
+use crate::tokenizer::{create_tokenizer, get_global_cache_stats, Tokenizer};
+
+/// Scanner statistics
+#[derive(Debug, Clone, Default)]
+pub struct ScannerStatistics {
+    /// Number of files processed
+    pub files_processed: usize,
+    /// Total number of lines
+    pub total_lines: usize,
+    /// Total number of characters
+    pub total_chars: usize,
+    /// Total number of tokens (if tokenizer is enabled)
+    pub total_tokens: Option&lt;usize&gt;,
+    /// Details for each file
+    pub file_details: HashMap&lt;String, FileReportInfo&gt;,
+    /// Token cache hits (if tokenizer caching is enabled)
+    pub token_cache_hits: Option&lt;usize&gt;,
+    /// Token cache misses (if tokenizer caching is enabled)
+    pub token_cache_misses: Option&lt;usize&gt;,
+}
+
+/// Scanner for directory contents
+pub struct Scanner {
+    /// Scanner configuration
+    config: Config,
+    /// Progress bar
+    pub progress: Arc&lt;ProgressBar&gt;,
+    /// Scanner statistics
+    statistics: Arc&lt;Mutex&lt;ScannerStatistics&gt;&gt;,
+    /// Tokenizer (if enabled)
+    tokenizer: Option&lt;Box&lt;dyn Tokenizer&gt;&gt;,
+}
+
+impl Scanner {
+    /// Create a new scanner
+    pub fn new(config: Config, progress: Arc&lt;ProgressBar&gt;) -&gt; Self {
+        // Create tokenizer if model is specified
+        let tokenizer = if let Some(model) = config.model {
+            let project_dir = config.target_dir.to_string_lossy().to_string();
+            match create_tokenizer(model, &amp;project_dir) {
+                Ok(t) =&gt; {
+                    progress.set_message(format!(&quot;Using tokenizer for model: {model:?}&quot;));
+                    Some(t)
+                }
+                Err(e) =&gt; {
+                    eprintln!(&quot;Error creating tokenizer: {}&quot;, e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        Self {
+            config,
+            progress,
+            statistics: Arc::new(Mutex::new(ScannerStatistics::default())),
+            tokenizer,
+        }
+    }
+
+    /// Normalize a path to be relative to the repository root
+    pub fn normalize_path(&amp;self, path: &amp;Path) -&gt; PathBuf {
+        // If we have git repo info, make paths relative to repo root
+        if let Some(repo_info) = &amp;self.config.git_repo {
+            // Try to make the path relative to the repository cache path
+            if let Ok(rel_path) = path.strip_prefix(&amp;repo_info.cache_path) {
+                return if rel_path == Path::new(&quot;&quot;) {
+                    // If it&apos;s the root, just return an empty path
+                    PathBuf::new()
+                } else {
+                    // Otherwise, return the relative path
+                    rel_path.to_path_buf()
+                };
+            }
+        }
+
+        // Default case: use the path as is
+        path.to_path_buf()
+    }
+
+    /// Convert an absolute path to a normalized relative path for reporting
+    pub fn get_normalized_path_for_reporting(&amp;self, abs_path: &amp;Path) -&gt; String {
+        if let Some(repo_info) = &amp;self.config.git_repo {
+            // For git repos, use owner/repo/path format
+            if let Ok(rel_path) = abs_path.strip_prefix(&amp;repo_info.cache_path) {
+                // If it&apos;s a directory with no path components, just return owner/repo
+                if rel_path == Path::new(&quot;&quot;) {
+                    format!(&quot;{}/{}&quot;, repo_info.owner, repo_info.name)
+                } else {
+                    format!(
+                        &quot;{}/{}/{}&quot;,
+                        repo_info.owner,
+                        repo_info.name,
+                        rel_path.display()
+                    )
+                }
+            } else {
+                // Fallback to full path
+                abs_path.display().to_string()
+            }
+        } else {
+            // For local paths, just use the path as is
+            abs_path.display().to_string()
+        }
+    }
+
+    /// Get scanner statistics
+    pub fn get_statistics(&amp;self) -&gt; ScannerStatistics {
+        let mut stats = self.statistics.lock().unwrap().clone();
+
+        // If we have a tokenizer, get cache stats from global counters
+        if self.tokenizer.is_some() {
+            let cache_stats = get_global_cache_stats();
+            stats.token_cache_hits = Some(cache_stats.hits);
+            stats.token_cache_misses = Some(cache_stats.misses);
+        }
+
+        stats
+    }
+
+    /// Scan the target directory and return the directory tree
+    pub fn scan(&amp;self) -&gt; io::Result&lt;DirectoryNode&gt; {
+        let abs_path = fs::canonicalize(&amp;self.config.target_dir)?;
+
+        // Determine the base directory name and path
+        let dir_name = if let Some(repo_info) = &amp;self.config.git_repo {
+            // For git repos, use the repo name
+            repo_info.name.clone()
+        } else {
+            // For local directories, use the directory name
+            abs_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()
+        };
+
+        // Create the initial relative path
+        let rel_path = PathBuf::from(&amp;dir_name);
+
+        self.scan_directory(&amp;abs_path, &amp;rel_path)
+    }
+
+    /// Scan a directory and return its node representation
+    fn scan_directory(&amp;self, abs_path: &amp;Path, rel_path: &amp;Path) -&gt; io::Result&lt;DirectoryNode&gt; {
+        let metadata = self.get_metadata(abs_path)?;
+        let mut contents = Vec::new();
+
+        // Determine which entries to process based on whether we&apos;re using gitignore
+        if self.config.respect_gitignore {
+            // Use ignore crate&apos;s Walk to handle .gitignore patterns
+            let mut walker = WalkBuilder::new(abs_path);
+            walker.max_depth(Some(1)); // Limit depth to just the current directory
+
+            // Use custom gitignore file if specified
+            if let Some(gitignore_path) = &amp;self.config.gitignore_path {
+                walker.add_custom_ignore_filename(gitignore_path);
+            }
+
+            // Get all entries using the ignore walker
+            let entries: Vec&lt;IgnoreDirEntry&gt; = walker
+                .build()
+                .filter_map(Result::ok)
+                .filter(|e| e.path() != abs_path) // Skip the root directory itself
+                .filter(|e| !self.should_ignore(e.path()))
+                .filter(|e| self.should_include(e.path()))
+                .collect();
+
+            // Split into directories and files
+            let (dirs, files): (Vec&lt;_&gt;, Vec&lt;_&gt;) =
+                entries.into_iter().partition(|e| e.path().is_dir());
+
+            // Process directories first (sequential)
+            for entry in dirs {
+                let entry_path = entry.path();
+                // Use normalize_path to get the correct relative path
+                let normalized_path = self.normalize_path(entry_path);
+                let new_rel_path = if normalized_path.components().count() &gt; 0 {
+                    // If we have a normalized path, use it
+                    normalized_path
+                } else {
+                    // Otherwise, just join with the entry name
+                    let entry_name = entry_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    rel_path.join(&amp;entry_name)
+                };
+
+                match self.scan_directory(entry_path, &amp;new_rel_path) {
+                    Ok(dir_node) =&gt; contents.push(Node::Directory(dir_node)),
+                    Err(e) =&gt; {
+                        eprintln!(&quot;Error processing directory {}: {}&quot;, entry_path.display(), e)
+                    }
+                }
+            }
+
+            // Process files in parallel
+            let file_nodes: Vec&lt;Node&gt; = files
+                .par_iter()
+                .filter_map(|entry| {
+                    let entry_path = entry.path();
+                    let entry_name = entry_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    let new_rel_path = rel_path.join(&amp;entry_name);
+
+                    match self.process_file(entry_path, &amp;new_rel_path) {
+                        Ok(node) =&gt; Some(node),
+                        Err(e) =&gt; {
+                            eprintln!(&quot;Error processing {}: {}&quot;, entry_path.display(), e);
+                            None
+                        }
+                    }
+                })
+                .collect();
+
+            contents.extend(file_nodes);
+        } else {
+            // Use traditional walkdir approach when not respecting .gitignore
+            let entries: Vec&lt;DirEntry&gt; = WalkDir::new(abs_path)
+                .max_depth(1)
+                .min_depth(1)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|e| !self.should_ignore(e.path()))
+                .filter(|e| self.should_include(e.path()))
+                .collect();
+
+            // Split into directories and files
+            let (dirs, files): (Vec&lt;_&gt;, Vec&lt;_&gt;) =
+                entries.into_iter().partition(|e| e.file_type().is_dir());
+
+            // Process directories first (sequential)
+            for entry in dirs {
+                let entry_name = entry.file_name().to_string_lossy().to_string();
+                let new_rel_path = rel_path.join(&amp;entry_name);
+
+                match self.scan_directory(entry.path(), &amp;new_rel_path) {
+                    Ok(dir_node) =&gt; contents.push(Node::Directory(dir_node)),
+                    Err(e) =&gt; eprintln!(
+                        &quot;Error processing directory {}: {}&quot;,
+                        entry.path().display(),
+                        e
+                    ),
+                }
+            }
+
+            // Process files in parallel
+            let file_nodes: Vec&lt;Node&gt; = files
+                .par_iter()
+                .filter_map(|entry| {
+                    let entry_name = entry.file_name().to_string_lossy().to_string();
+                    let new_rel_path = rel_path.join(&amp;entry_name);
+
+                    match self.process_file(entry.path(), &amp;new_rel_path) {
+                        Ok(node) =&gt; Some(node),
+                        Err(e) =&gt; {
+                            eprintln!(&quot;Error processing {}: {}&quot;, entry.path().display(), e);
+                            None
+                        }
+                    }
+                })
+                .collect();
+
+            contents.extend(file_nodes);
+        }
+
+        Ok(DirectoryNode {
+            name: abs_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+            path: rel_path.to_path_buf(),
+            metadata,
+            contents,
+        })
+    }
+
+    /// Process a single file and return its node representation
+    fn process_file(&amp;self, abs_path: &amp;Path, rel_path: &amp;Path) -&gt; io::Result&lt;Node&gt; {
+        self.progress.inc(1);
+
+        // Update progress message to show current file
+        let file_name = abs_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        // Update the progress message with the filename
+        // Truncate if too long to avoid display issues
+        let display_name = if file_name.len() &gt; 40 {
+            format!(&quot;...{}&quot;, &amp;file_name[file_name.len().saturating_sub(37)..])
+        } else {
+            file_name.clone()
+        };
+
+        // Enhance display with repository context if applicable
+        let progress_message = if let Some(repo_info) = &amp;self.config.git_repo {
+            format!(
+                &quot;Current file: {}/{}/{}&quot;,
+                repo_info.owner, repo_info.name, display_name
+            )
+        } else {
+            format!(&quot;Current file: {}&quot;, display_name)
+        };
+
+        self.progress.set_message(progress_message);
+
+        let file_type = self.get_file_type(abs_path)?;
+        let metadata = self.get_metadata(abs_path)?;
+
+        // Use the normalized path for reporting
+        let file_path = if let Some(repo_info) = &amp;self.config.git_repo {
+            // For repositories, use the format owner/repo/path
+            format!(
+                &quot;{}/{}/{}&quot;,
+                repo_info.owner,
+                repo_info.name,
+                rel_path.display()
+            )
+        } else {
+            // For local directories, use the relative path as is
+            rel_path.to_string_lossy().to_string()
+        };
+
+        match file_type {
+            FileType::TextFile =&gt; {
+                let content = self.read_file_content(abs_path)?;
+                Ok(Node::File(FileNode {
+                    name: file_name,
+                    path: rel_path.to_path_buf(),
+                    metadata,
+                    content,
+                }))
+            }
+            FileType::BinaryFile =&gt; {
+                // Update statistics for binary files
+                {
+                    let mut stats = self.statistics.lock().unwrap();
+                    stats.files_processed += 1;
+                    stats.file_details.insert(
+                        file_path,
+                        FileReportInfo {
+                            lines: 0,
+                            chars: 0,
+                            tokens: None,
+                        },
+                    );
+                }
+
+                Ok(Node::Binary(BinaryNode {
+                    name: file_name,
+                    path: rel_path.to_path_buf(),
+                    metadata,
+                }))
+            }
+            FileType::Symlink =&gt; {
+                let target = fs::read_link(abs_path)?.to_string_lossy().to_string();
+
+                // Update statistics for symlinks
+                {
+                    let mut stats = self.statistics.lock().unwrap();
+                    stats.files_processed += 1;
+                    stats.file_details.insert(
+                        file_path,
+                        FileReportInfo {
+                            lines: 0,
+                            chars: target.chars().count(),
+                            tokens: None,
+                        },
+                    );
+                }
+
+                Ok(Node::Symlink(SymlinkNode {
+                    name: file_name,
+                    path: rel_path.to_path_buf(),
+                    metadata,
+                    target,
+                }))
+            }
+            _ =&gt; Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!(&quot;Unexpected file type for {}&quot;, abs_path.display()),
+            )),
+        }
+    }
+
+    /// Check if a file should be ignored based on patterns and defaults
+    pub fn should_ignore(&amp;self, path: &amp;Path) -&gt; bool {
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+
+        // Check custom ignore patterns
+        for pattern in &amp;self.config.ignore_patterns {
+            if glob_match(pattern, &amp;file_name) {
+                return true;
+            }
+        }
+
+        // Check default ignore patterns
+        if DEFAULT_IGNORE.iter().any(|&amp;p| p == file_name) {
+            return true;
+        }
+
+        // Don&apos;t process the output file itself
+        if path.ends_with(&amp;self.config.output_file) {
+            return true;
+        }
+
+        false
+    }
+
+    /// Check if a file should be included based on patterns
+    pub fn should_include(&amp;self, path: &amp;Path) -&gt; bool {
+        // If no include patterns, include everything
+        if self.config.include_patterns.is_empty() {
+            return true;
+        }
+
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+
+        // Check against include patterns
+        for pattern in &amp;self.config.include_patterns {
+            if glob_match(pattern, &amp;file_name) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Determine the type of a file
+    fn get_file_type(&amp;self, path: &amp;Path) -&gt; io::Result&lt;FileType&gt; {
+        let metadata = fs::metadata(path)?;
+
+        if metadata.is_dir() {
+            return Ok(FileType::Directory);
+        }
+
+        if metadata.file_type().is_symlink() {
+            return Ok(FileType::Symlink);
+        }
+
+        if metadata.is_file() {
+            // For smaller files, try to detect if they&apos;re text
+            if metadata.len() &lt; 8_000_000 {
+                // Read a sample of the file to determine type
+                let mut buffer = vec![0; std::cmp::min(8192, metadata.len() as usize)];
+                if !buffer.is_empty() {
+                    let mut file = File::open(path)?;
+                    let bytes_read = file.read(&amp;mut buffer)?;
+                    buffer.truncate(bytes_read);
+
+                    // Simple heuristic for text files: check for valid UTF-8 and high text-to-binary ratio
+                    if String::from_utf8(buffer.clone()).is_ok() {
+                        // Count binary characters (0x00-0x08, 0x0E-0x1F)
+                        let binary_count = buffer
+                            .iter()
+                            .filter(|&amp;&amp;b| (b &lt; 9) || (b &gt; 13 &amp;&amp; b &lt; 32))
+                            .count();
+                        let binary_ratio = binary_count as f32 / buffer.len() as f32;
+
+                        if binary_ratio &lt; 0.1 {
+                            return Ok(FileType::TextFile);
+                        }
+                    }
+                }
+            }
+
+            // Default to binary for any non-text file
+            return Ok(FileType::BinaryFile);
+        }
+
+        Ok(FileType::Other)
+    }
+
+    /// Extract metadata from a file
+    fn get_metadata(&amp;self, path: &amp;Path) -&gt; io::Result&lt;Metadata&gt; {
+        let fs_metadata = fs::metadata(path)?;
+
+        Ok(Metadata {
+            size: fs_metadata.len(),
+            modified: fs_metadata.modified()?,
+            permissions: format!(&quot;{:o}&quot;, fs_metadata.permissions().mode() &amp; 0o777),
+        })
+    }
+
+    /// Read the content of a text file and update statistics
+    fn read_file_content(&amp;self, path: &amp;Path) -&gt; io::Result&lt;Option&lt;String&gt;&gt; {
+        let metadata = fs::metadata(path)?;
+        // Get the normalized path for reporting
+        let file_path = self.get_normalized_path_for_reporting(path);
+
+        // Skip large files
+        if metadata.len() &gt; 1_048_576 {
+            // 1MB limit
+            let message = format!(
+                &quot;File too large to include content. Size: {}&quot;,
+                format_file_size(metadata.len())
+            );
+
+            // Still update statistics for skipped files
+            {
+                let mut stats = self.statistics.lock().unwrap();
+                stats.files_processed += 1;
+                stats.file_details.insert(
+                    file_path,
+                    FileReportInfo {
+                        lines: 0,
+                        chars: 0,
+                        tokens: None,
+                    },
+                );
+            }
+
+            return Ok(Some(message));
+        }
+
+        // Read file content
+        let mut content = String::new();
+        match File::open(path) {
+            Ok(file) =&gt; {
+                let mut line_count = 0;
+                let mut char_count = 0;
+
+                // Count lines and chars
+                let reader = BufReader::new(&amp;file);
+                for line in reader.lines() {
+                    match line {
+                        Ok(line) =&gt; {
+                            line_count += 1;
+                            char_count += line.chars().count();
+                            // Add newline char that&apos;s stripped by lines() iterator
+                            char_count += 1;
+                        }
+                        Err(_) =&gt; break,
+                    }
+                }
+
+                // Re-read file for content
+                let mut file = File::open(path)?;
+                if let Err(e) = file.read_to_string(&amp;mut content) {
+                    return Ok(Some(format!(&quot;Failed to read file content: {}&quot;, e)));
+                }
+
+                // Count tokens if tokenizer is enabled
+                let token_count = if let Some(tokenizer) = &amp;self.tokenizer {
+                    match tokenizer.count_tokens(&amp;content) {
+                        Ok(count) =&gt; Some(count.tokens),
+                        Err(e) =&gt; {
+                            eprintln!(&quot;Error counting tokens for {}: {}&quot;, path.display(), e);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                // Update statistics
+                {
+                    let mut stats = self.statistics.lock().unwrap();
+                    stats.files_processed += 1;
+                    stats.total_lines += line_count;
+                    stats.total_chars += char_count;
+
+                    // Update token count if available
+                    if let Some(tokens) = token_count {
+                        stats.total_tokens = Some(stats.total_tokens.unwrap_or(0) + tokens);
+                    }
+
+                    stats.file_details.insert(
+                        file_path,
+                        FileReportInfo {
+                            lines: line_count,
+                            chars: char_count,
+                            tokens: token_count,
+                        },
+                    );
+                }
+            }
+            Err(e) =&gt; {
+                return Ok(Some(format!(&quot;Failed to open file: {}&quot;, e)));
+            }
+        }
+
+        Ok(Some(content))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use indicatif::ProgressBar;
+
+    use crate::config::{Config, GitCachePolicy};
+    use crate::git::{GitHost, GitRepoInfo};
+    use crate::scanner::Scanner;
+
+    #[test]
+    fn test_normalize_path() {
+        // Create a test config with a mock Git repository
+        let repo_path = PathBuf::from(&quot;/tmp/cache/dumpfs/github/username/repo&quot;);
+        let git_repo = GitRepoInfo {
+            url: &quot;https://github.com/username/repo&quot;.to_string(),
+            host: GitHost::GitHub,
+            owner: &quot;username&quot;.to_string(),
+            name: &quot;repo&quot;.to_string(),
+            cache_path: repo_path.clone(),
+        };
+
+        let config = Config {
+            target_dir: repo_path.clone(),
+            output_file: PathBuf::from(&quot;output.xml&quot;),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+            respect_gitignore: false,
+            gitignore_path: None,
+            model: None,
+            repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
+            git_repo: Some(git_repo),
+            git_cache_policy: GitCachePolicy::AlwaysPull,
+        };
+
+        let scanner = Scanner::new(config, Arc::new(ProgressBar::hidden()));
+
+        // Test paths at various depths
+        let test_cases = vec![
+            // Path in repo root should normalize to empty path or just filename
+            (repo_path.join(&quot;file.txt&quot;), PathBuf::from(&quot;file.txt&quot;)),
+            // Path in subdirectory should be relative to repo root
+            (
+                repo_path.join(&quot;src&quot;).join(&quot;main.rs&quot;),
+                PathBuf::from(&quot;src/main.rs&quot;),
+            ),
+            // Path outside repo shouldn&apos;t change
+            (
+                PathBuf::from(&quot;/other/path/file.txt&quot;),
+                PathBuf::from(&quot;/other/path/file.txt&quot;),
+            ),
+        ];
+
+        for (input, expected) in test_cases {
+            let normalized = scanner.normalize_path(&amp;input);
+            assert_eq!(normalized, expected);
+        }
+    }
+
+    #[test]
+    fn test_get_normalized_path_for_reporting() {
+        // Create a test config with a mock Git repository
+        let repo_path = PathBuf::from(&quot;/tmp/cache/dumpfs/github/username/repo&quot;);
+        let git_repo = GitRepoInfo {
+            url: &quot;https://github.com/username/repo&quot;.to_string(),
+            host: GitHost::GitHub,
+            owner: &quot;username&quot;.to_string(),
+            name: &quot;repo&quot;.to_string(),
+            cache_path: repo_path.clone(),
+        };
+
+        let config = Config {
+            target_dir: repo_path.clone(),
+            output_file: PathBuf::from(&quot;output.xml&quot;),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+            respect_gitignore: false,
+            gitignore_path: None,
+            model: None,
+            repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
+            git_repo: Some(git_repo),
+            git_cache_policy: GitCachePolicy::AlwaysPull,
+        };
+
+        let scanner = Scanner::new(config, Arc::new(ProgressBar::hidden()));
+
+        // Test path formatting for different types of paths
+        let root_path = repo_path.clone();
+        let src_path = repo_path.join(&quot;src&quot;).join(&quot;main.rs&quot;);
+
+        // Repository root should show as &quot;username/repo&quot;
+        let root_display = scanner.get_normalized_path_for_reporting(&amp;root_path);
+        assert_eq!(root_display, &quot;username/repo&quot;);
+
+        // File in repo should show as &quot;username/repo/src/main.rs&quot;
+        let src_display = scanner.get_normalized_path_for_reporting(&amp;src_path);
+        assert_eq!(src_display, &quot;username/repo/src/main.rs&quot;);
+
+        // Path outside repo should just use the full path
+        let other_path = PathBuf::from(&quot;/other/path/file.txt&quot;);
+        let other_display = scanner.get_normalized_path_for_reporting(&amp;other_path);
+        assert_eq!(other_display, &quot;/other/path/file.txt&quot;);
+    }
+}
 </content>
           </file>
         </contents>
       </directory>
-      <file name="Cargo.toml" path="postgres-context-server/Cargo.toml">
+      <file name="Cargo.toml" path="dumpfs/Cargo.toml">
         <metadata>
-          <size>248</size>
-          <modified>2025-03-27T19:23:53.127316377+03:00</modified>
+          <size>973</size>
+          <modified>2025-03-27T22:07:27.204042067+03:00</modified>
           <permissions>644</permissions>
         </metadata>
         <content>[package]
-name = &quot;zed_postgres_model_context&quot;
-version = &quot;0.0.1&quot;
+name = &quot;dumpfs&quot;
+version = &quot;0.1.0&quot;
 edition = &quot;2021&quot;
-publish = false
-license = &quot;Apache-2.0&quot;
-
-[lib]
-path = &quot;src/postgres_model_context.rs&quot;
-crate-type = [&quot;cdylib&quot;]
+description = &quot;Generate XML representation of directory contents for LLM context&quot;
+authors = [&quot;kkharji&quot;]
+license = &quot;MIT&quot;
 
 [dependencies]
-serde = &quot;1.0&quot;
-zed_extension_api = &quot;0.2.0&quot;
+clap = { version = &quot;4.3&quot;, features = [&quot;derive&quot;] }
+clap_complete = { version = &quot;4.3&quot;, features = [&quot;unstable-dynamic&quot;] }
+walkdir = &quot;2.3&quot;
+git2 = &quot;0.18&quot;
+url = &quot;2.5&quot;
+regex = &quot;1.10&quot;
+thiserror = &quot;1.0&quot;
+quick-xml = &quot;0.37.3&quot;
+rayon = &quot;1.7&quot;
+indicatif = &quot;0.17&quot;
+glob-match = &quot;0.2&quot;
+chrono = &quot;0.4&quot;
+once_cell = &quot;1.18&quot;
+hostname = &quot;0.4.0&quot;
+ignore = &quot;0.4.21&quot;
+tabled = &quot;0.18.0&quot;
+tokenizers = { version = &quot;0.21.1&quot;,  features = [&quot;http&quot;] }
+strum = { version = &quot;0.27.1&quot;, features = [&quot;derive&quot;] }
+reqwest = { version = &quot;0.12.15&quot;, features = [&quot;json&quot;, &quot;blocking&quot;] }
+serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }
+serde_json = &quot;1.0&quot;
+tiktoken-rs = &quot;0.6.0&quot;
+dirs = &quot;6.0.0&quot;
+
+[dev-dependencies]
+tempfile = &quot;3.8&quot;
+filetime = &quot;0.2.15&quot;
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = &quot;abort&quot;
+strip = true
 </content>
       </file>
-      <file name="extension.toml" path="postgres-context-server/extension.toml">
+      <binary name="README.md" path="dumpfs/README.md">
         <metadata>
-          <size>344</size>
-          <modified>2025-03-27T19:23:53.127316377+03:00</modified>
+          <size>11675</size>
+          <modified>2025-03-27T19:14:34.304929991+03:00</modified>
           <permissions>644</permissions>
         </metadata>
-        <content>id = &quot;postgres-context-server&quot;
-name = &quot;Postgres Context Server&quot;
-description = &quot;Model Context Server for PostgreSQL&quot;
-version = &quot;0.0.1&quot;
-schema_version = 1
-authors = [&quot;Max Brunsfeld &lt;max@zed.dev&gt;&quot;]
-repository = &quot;https://github.com/zed-extensions/postgres-context-server&quot;
-
-[context_servers.postgres-context-server]
-name = &quot;Postgres Context Server&quot;
-</content>
-      </file>
-      <file name="README.md" path="postgres-context-server/README.md">
-        <metadata>
-          <size>723</size>
-          <modified>2025-03-27T19:23:53.127316377+03:00</modified>
-          <permissions>644</permissions>
-        </metadata>
-        <content># Zed Postgres Context Server
-
-This extension provides a Model Context Server for Postgres, for use with the Zed AI assistant.
-
-It adds a `/pg-schema` slash command to the Assistant Panel.
-
-## Configuration
-
-To use the extension, you will need to point the context server at a Postgres database by setting the `database_url` in your Zed `settings.json`:
-
-```json
-{
-  &quot;context_servers&quot;: {
-    &quot;postgres-context-server&quot;: {
-      &quot;settings&quot;: {
-        &quot;database_url&quot;: &quot;postgresql://myuser:mypassword@localhost:5432/mydatabase&quot;
-      }
-    }
-  }
-}
-```
-
-## Usage
-
-- `/pg-schema &lt;table-name&gt;`: Retrieve the schema for the table with the given name.
-- `/pg-schema all-tables`: Retrieve the schemas for all tables in the database.
-</content>
-      </file>
+      </binary>
     </contents>
   </directory>
 </directory_scan>
