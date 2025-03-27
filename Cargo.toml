@@ -8,6 +8,7 @@ license = "MIT"
 
 [dependencies]
 clap = { version = "4.3", features = ["derive"] }
+clap_complete = { version = "4.3", features = ["unstable-dynamic"] }
 walkdir = "2.3"
 quick-xml = "0.37.3"
 rayon = "1.7"

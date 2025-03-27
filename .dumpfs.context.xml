@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<directory_scan timestamp="2025-03-27T07:56:49.048943365+03:00">
+<directory_scan timestamp="2025-03-27T19:03:44.928159839+03:00">
   <system_info>
     <hostname>penzu</hostname>
     <os>linux</os>
@@ -8,7 +8,7 @@
   <directory name="dumpfs" path="dumpfs">
     <metadata>
       <size>142</size>
-      <modified>2025-03-27T07:52:28.397941924+03:00</modified>
+      <modified>2025-03-27T18:56:43.583583145+03:00</modified>
       <permissions>755</permissions>
     </metadata>
     <contents>
@@ -1098,8 +1098,8 @@ impl XmlWriter {
           </file>
           <file name="config.rs" path="dumpfs/src/config.rs">
             <metadata>
-              <size>3930</size>
-              <modified>2025-03-27T06:20:43.378840659+03:00</modified>
+              <size>4072</size>
+              <modified>2025-03-27T19:00:03.849358150+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -1110,6 +1110,7 @@ use std::io;
 use std::path::PathBuf;
 
 use clap::Parser;
+use clap_complete::Shell;
 
 use crate::tokenizer::Model;
 
@@ -1153,6 +1154,10 @@ pub struct Args {
     /// LLM model to use for tokenization (enables token counting)
     #[clap(long, value_enum)]
     pub model: Option&lt;Model&gt;,
+    
+    /// Generate shell completions
+    #[clap(long = &quot;generate&quot;, value_enum)]
+    pub generate: Option&lt;Shell&gt;,
 }
 
 /// Application configuration
@@ -1271,8 +1276,8 @@ pub const VERSION: &amp;str = env!(&quot;CARGO_PKG_VERSION&quot;);
           </file>
           <file name="main.rs" path="dumpfs/src/main.rs">
             <metadata>
-              <size>3567</size>
-              <modified>2025-03-27T07:37:18.626274561+03:00</modified>
+              <size>4231</size>
+              <modified>2025-03-27T19:00:36.406323829+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -1283,7 +1288,8 @@ use std::io;
 use std::sync::Arc;
 use std::time::Instant;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+use clap_complete::{generate, CompleteEnv, Shell};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::ThreadPoolBuilder;
 
@@ -1293,9 +1299,30 @@ use dumpfs::scanner::Scanner;
 use dumpfs::utils::count_files;
 use dumpfs::writer::XmlWriter;
 
+/// Generate shell completions
+fn print_completions(generator: Shell, cmd: &amp;mut clap::Command) {
+    generate(
+        generator,
+        cmd,
+        cmd.get_name().to_string(),
+        &amp;mut io::stdout(),
+    );
+}
+
 fn main() -&gt; io::Result&lt;()&gt; {
+    // Enable automatic shell completion
+    CompleteEnv::with_factory(|| Args::command()).complete();
+
     // Parse command line arguments
     let args = Args::parse();
+    
+    // Handle completions if requested
+    if let Some(generator) = args.generate {
+        let mut cmd = Args::command();
+        eprintln!(&quot;Generating completion file for {generator:?}...&quot;);
+        print_completions(generator, &amp;mut cmd);
+        return Ok(());
+    }
 
     // Create configuration
     let config = Config::from_args(args);
@@ -2862,10 +2889,55 @@ mod tests {
           </file>
         </contents>
       </directory>
+      <file name="Cargo.toml" path="dumpfs/Cargo.toml">
+        <metadata>
+          <size>894</size>
+          <modified>2025-03-27T19:00:59.236300074+03:00</modified>
+          <permissions>644</permissions>
+        </metadata>
+        <content>[package]
+name = &quot;dumpfs&quot;
+version = &quot;0.1.0&quot;
+edition = &quot;2021&quot;
+description = &quot;Generate XML representation of directory contents for LLM context&quot;
+authors = [&quot;kkharji&quot;]
+license = &quot;MIT&quot;
+
+[dependencies]
+clap = { version = &quot;4.3&quot;, features = [&quot;derive&quot;] }
+clap_complete = { version = &quot;4.3&quot;, features = [&quot;unstable-dynamic&quot;] }
+walkdir = &quot;2.3&quot;
+quick-xml = &quot;0.37.3&quot;
+rayon = &quot;1.7&quot;
+indicatif = &quot;0.17&quot;
+glob-match = &quot;0.2&quot;
+chrono = &quot;0.4&quot;
+once_cell = &quot;1.18&quot;
+hostname = &quot;0.4.0&quot;
+ignore = &quot;0.4.21&quot;
+tabled = &quot;0.18.0&quot;
+tokenizers = { version = &quot;0.21.1&quot;,  features = [&quot;http&quot;] }
+strum = { version = &quot;0.27.1&quot;, features = [&quot;derive&quot;] }
+reqwest = { version = &quot;0.12.15&quot;, features = [&quot;json&quot;, &quot;blocking&quot;] }
+serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }
+serde_json = &quot;1.0&quot;
+tiktoken-rs = &quot;0.6.0&quot;
+dirs = &quot;6.0.0&quot;
+
+[dev-dependencies]
+tempfile = &quot;3.8&quot;
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = &quot;abort&quot;
+strip = true
+</content>
+      </file>
       <file name="README.md" path="dumpfs/README.md">
         <metadata>
-          <size>8763</size>
-          <modified>2025-03-27T07:53:55.088917414+03:00</modified>
+          <size>9522</size>
+          <modified>2025-03-27T19:02:25.534212370+03:00</modified>
           <permissions>644</permissions>
         </metadata>
         <content># DumpFS: Directory Context Generator for LLMs
@@ -2898,6 +2970,32 @@ cargo build --release
 
 The binary will be available at `target/release/dumpfs`.
 
+### Shell Completion
+
+dumpfs supports shell completion for Bash, Fish, Zsh, Elvish, and PowerShell. To generate completion scripts, use:
+
+```bash
+# For bash
+dumpfs --generate bash &gt; ~/.local/share/bash-completion/completions/dumpfs
+
+# For zsh
+dumpfs --generate zsh &gt; ~/.zfunc/_dumpfs
+
+# For fish
+dumpfs --generate fish &gt; ~/.config/fish/completions/dumpfs.fish
+
+# For PowerShell
+dumpfs --generate powershell &gt; _dumpfs.ps1
+```
+
+For Zsh, make sure to add `~/.zfunc` to your `fpath` in your `.zshrc`:
+
+```zsh
+fpath=( ~/.zfunc $fpath )
+```
+
+Shell completion provides auto-completion for commands, options, and even supported model types for the `--model` option.
+
 ## Usage
 
 ```
@@ -2910,6 +3008,7 @@ OPTIONS:
     --respect-gitignore &lt;BOOL&gt;                   Whether to respect .gitignore files (default: true)
     --gitignore-path &lt;PATH&gt;                      Path to custom .gitignore file
     --model &lt;MODEL&gt;                              LLM model to use for tokenization
+    --generate &lt;SHELL&gt;                           Generate shell completions (bash, zsh, fish, etc.)
 ```
 
 ### Supported Models
@@ -3089,50 +3188,6 @@ Tokenization is often the most time-consuming part of the process, especially wh
 ## License
 
 MIT
-</content>
-      </file>
-      <file name="Cargo.toml" path="dumpfs/Cargo.toml">
-        <metadata>
-          <size>825</size>
-          <modified>2025-03-27T07:52:04.921654101+03:00</modified>
-          <permissions>644</permissions>
-        </metadata>
-        <content>[package]
-name = &quot;dumpfs&quot;
-version = &quot;0.1.0&quot;
-edition = &quot;2021&quot;
-description = &quot;Generate XML representation of directory contents for LLM context&quot;
-authors = [&quot;kkharji&quot;]
-license = &quot;MIT&quot;
-
-[dependencies]
-clap = { version = &quot;4.3&quot;, features = [&quot;derive&quot;] }
-walkdir = &quot;2.3&quot;
-quick-xml = &quot;0.37.3&quot;
-rayon = &quot;1.7&quot;
-indicatif = &quot;0.17&quot;
-glob-match = &quot;0.2&quot;
-chrono = &quot;0.4&quot;
-once_cell = &quot;1.18&quot;
-hostname = &quot;0.4.0&quot;
-ignore = &quot;0.4.21&quot;
-tabled = &quot;0.18.0&quot;
-tokenizers = { version = &quot;0.21.1&quot;,  features = [&quot;http&quot;] }
-strum = { version = &quot;0.27.1&quot;, features = [&quot;derive&quot;] }
-reqwest = { version = &quot;0.12.15&quot;, features = [&quot;json&quot;, &quot;blocking&quot;] }
-serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }
-serde_json = &quot;1.0&quot;
-tiktoken-rs = &quot;0.6.0&quot;
-dirs = &quot;5.0.1&quot;
-
-[dev-dependencies]
-tempfile = &quot;3.8&quot;
-
-[profile.release]
-lto = true
-codegen-units = 1
-panic = &quot;abort&quot;
-strip = true
 </content>
       </file>
     </contents>

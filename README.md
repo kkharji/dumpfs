@@ -40,6 +40,7 @@ OPTIONS:
     --respect-gitignore <BOOL>                   Whether to respect .gitignore files (default: true)
     --gitignore-path <PATH>                      Path to custom .gitignore file
     --model <MODEL>                              LLM model to use for tokenization
+    --generate <SHELL>                           Generate shell completions (bash, zsh, fish, etc.)
 ```
 
 ### Supported Models
@@ -74,6 +75,33 @@ When running the command, you'll see a beautiful progress display showing:
 - Estimated time remaining
 
 After completion, you'll get a comprehensive summary showing file statistics and token estimation for LLM usage.
+
+### Shell Completion
+
+dumpfs supports shell completion for Bash, Fish, Zsh, Elvish, and PowerShell. To generate completion scripts, use:
+
+```bash
+# For bash
+dumpfs --generate bash > ~/.local/share/bash-completion/completions/dumpfs
+
+# For zsh
+dumpfs --generate zsh > ~/.zfunc/_dumpfs
+
+# For fish
+dumpfs --generate fish > ~/.config/fish/completions/dumpfs.fish
+
+# For PowerShell
+dumpfs --generate powershell > _dumpfs.ps1
+```
+
+For Zsh, make sure to add `~/.zfunc` to your `fpath` in your `.zshrc`:
+
+```zsh
+fpath=( ~/.zfunc $fpath )
+```
+
+Shell completion provides auto-completion for commands, options, and even supported model types for the `--model` option.
+
 
 ### Examples
 

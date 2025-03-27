@@ -6,6 +6,7 @@ use std::io;
 use std::path::PathBuf;
 
 use clap::Parser;
+use clap_complete::Shell;
 
 use crate::tokenizer::Model;
 
@@ -49,6 +50,10 @@ pub struct Args {
     /// LLM model to use for tokenization (enables token counting)
     #[clap(long, value_enum)]
     pub model: Option<Model>,
+    
+    /// Generate shell completions
+    #[clap(long = "generate", value_enum)]
+    pub generate: Option<Shell>,
 }
 
 /// Application configuration

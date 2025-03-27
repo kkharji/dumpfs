@@ -6,7 +6,8 @@ use std::io;
 use std::sync::Arc;
 use std::time::Instant;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+use clap_complete::{generate, CompleteEnv, Shell};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::ThreadPoolBuilder;
 
@@ -16,9 +17,30 @@ use dumpfs::scanner::Scanner;
 use dumpfs::utils::count_files;
 use dumpfs::writer::XmlWriter;
 
+/// Generate shell completions
+fn print_completions(generator: Shell, cmd: &mut clap::Command) {
+    generate(
+        generator,
+        cmd,
+        cmd.get_name().to_string(),
+        &mut io::stdout(),
+    );
+}
+
 fn main() -> io::Result<()> {
+    // Enable automatic shell completion
+    CompleteEnv::with_factory(|| Args::command()).complete();
+
     // Parse command line arguments
     let args = Args::parse();
+    
+    // Handle completions if requested
+    if let Some(generator) = args.generate {
+        let mut cmd = Args::command();
+        eprintln!("Generating completion file for {generator:?}...");
+        print_completions(generator, &mut cmd);
+        return Ok(());
+    }
 
     // Create configuration
     let config = Config::from_args(args);
