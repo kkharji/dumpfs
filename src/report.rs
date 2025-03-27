@@ -183,14 +183,17 @@ impl Reporter {
             format!("{} tokens (counted)", self.format_number(tokens))
         } else {
             let estimated_tokens = report.total_chars / 4;
-            format!("{} tokens (estimated)", self.format_number(estimated_tokens))
+            format!(
+                "{} tokens (estimated)",
+                self.format_number(estimated_tokens)
+            )
         };
 
         rows.push(SummaryRow {
             key: "📦 LLM Tokens".to_string(),
             value: token_text,
         });
-        
+
         // Add cache statistics if available
         if let (Some(hits), Some(misses)) = (report.token_cache_hits, report.token_cache_misses) {
             let total = hits + misses;
@@ -199,7 +202,7 @@ impl Reporter {
             } else {
                 "0.0%".to_string()
             };
-            
+
             rows.push(SummaryRow {
                 key: "🔄 Cache Hit Rate".to_string(),
                 value: format!("{} ({} hits / {} total)", hit_rate, hits, total),

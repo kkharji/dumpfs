@@ -10,6 +10,10 @@ license = "MIT"
 clap = { version = "4.3", features = ["derive"] }
 clap_complete = { version = "4.3", features = ["unstable-dynamic"] }
 walkdir = "2.3"
+git2 = "0.18"
+url = "2.5"
+regex = "1.10"
+thiserror = "1.0"
 quick-xml = "0.37.3"
 rayon = "1.7"
 indicatif = "0.17"
@@ -29,6 +33,7 @@ dirs = "6.0.0"
 
 [dev-dependencies]
 tempfile = "3.8"
+filetime = "0.2.15"
 
 [profile.release]
 lto = true

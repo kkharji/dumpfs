@@ -10,6 +10,7 @@ use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 
 use crate::config::Config;
+use crate::git::GitHost;
 use crate::types::{BinaryNode, DirectoryNode, FileNode, Metadata, Node, SymlinkNode};
 
 /// XML writer for directory contents
@@ -74,6 +75,39 @@ impl XmlWriter {
         let kernel = std::env::consts::FAMILY;
         writer.write_event(Event::Text(BytesText::new(kernel)))?;
         writer.write_event(Event::End(BytesEnd::new("kernel")))?;
+
+        // Write Git repository information if available
+        if let Some(git_repo) = &self.config.git_repo {
+            writer.write_event(Event::Start(BytesStart::new("git_repository")))?;
+
+            // Write URL
+            writer.write_event(Event::Start(BytesStart::new("url")))?;
+            writer.write_event(Event::Text(BytesText::new(&git_repo.url)))?;
+            writer.write_event(Event::End(BytesEnd::new("url")))?;
+
+            // Write host
+            writer.write_event(Event::Start(BytesStart::new("host")))?;
+            let host_name = match &git_repo.host {
+                GitHost::GitHub => "github.com",
+                GitHost::GitLab => "gitlab.com",
+                GitHost::Bitbucket => "bitbucket.org",
+                GitHost::Other(name) => name,
+            };
+            writer.write_event(Event::Text(BytesText::new(host_name)))?;
+            writer.write_event(Event::End(BytesEnd::new("host")))?;
+
+            // Write owner
+            writer.write_event(Event::Start(BytesStart::new("owner")))?;
+            writer.write_event(Event::Text(BytesText::new(&git_repo.owner)))?;
+            writer.write_event(Event::End(BytesEnd::new("owner")))?;
+
+            // Write repository name
+            writer.write_event(Event::Start(BytesStart::new("name")))?;
+            writer.write_event(Event::Text(BytesText::new(&git_repo.name)))?;
+            writer.write_event(Event::End(BytesEnd::new("name")))?;
+
+            writer.write_event(Event::End(BytesEnd::new("git_repository")))?;
+        }
 
         writer.write_event(Event::End(BytesEnd::new("system_info")))?;
 

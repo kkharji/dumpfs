@@ -81,30 +81,87 @@ impl Scanner {
         }
     }
 
+    /// Normalize a path to be relative to the repository root
+    pub fn normalize_path(&self, path: &Path) -> PathBuf {
+        // If we have git repo info, make paths relative to repo root
+        if let Some(repo_info) = &self.config.git_repo {
+            // Try to make the path relative to the repository cache path
+            if let Ok(rel_path) = path.strip_prefix(&repo_info.cache_path) {
+                return if rel_path == Path::new("") {
+                    // If it's the root, just return an empty path
+                    PathBuf::new()
+                } else {
+                    // Otherwise, return the relative path
+                    rel_path.to_path_buf()
+                };
+            }
+        }
+
+        // Default case: use the path as is
+        path.to_path_buf()
+    }
+
+    /// Convert an absolute path to a normalized relative path for reporting
+    pub fn get_normalized_path_for_reporting(&self, abs_path: &Path) -> String {
+        if let Some(repo_info) = &self.config.git_repo {
+            // For git repos, use owner/repo/path format
+            if let Ok(rel_path) = abs_path.strip_prefix(&repo_info.cache_path) {
+                // If it's a directory with no path components, just return owner/repo
+                if rel_path == Path::new("") {
+                    format!("{}/{}", repo_info.owner, repo_info.name)
+                } else {
+                    format!(
+                        "{}/{}/{}",
+                        repo_info.owner,
+                        repo_info.name,
+                        rel_path.display()
+                    )
+                }
+            } else {
+                // Fallback to full path
+                abs_path.display().to_string()
+            }
+        } else {
+            // For local paths, just use the path as is
+            abs_path.display().to_string()
+        }
+    }
+
     /// Get scanner statistics
     pub fn get_statistics(&self) -> ScannerStatistics {
         let mut stats = self.statistics.lock().unwrap().clone();
-        
+
         // If we have a tokenizer, get cache stats from global counters
         if self.tokenizer.is_some() {
             let (hits, misses) = crate::tokenizer::CachedTokenizer::get_global_cache_stats();
             stats.token_cache_hits = Some(hits);
             stats.token_cache_misses = Some(misses);
         }
-        
+
         stats
     }
 
     /// Scan the target directory and return the directory tree
     pub fn scan(&self) -> io::Result<DirectoryNode> {
         let abs_path = fs::canonicalize(&self.config.target_dir)?;
-        let dir_name = abs_path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
 
-        self.scan_directory(&abs_path, &PathBuf::from(&dir_name))
+        // Determine the base directory name and path
+        let dir_name = if let Some(repo_info) = &self.config.git_repo {
+            // For git repos, use the repo name
+            repo_info.name.clone()
+        } else {
+            // For local directories, use the directory name
+            abs_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string()
+        };
+
+        // Create the initial relative path
+        let rel_path = PathBuf::from(&dir_name);
+
+        self.scan_directory(&abs_path, &rel_path)
     }
 
     /// Scan a directory and return its node representation
@@ -139,12 +196,20 @@ impl Scanner {
             // Process directories first (sequential)
             for entry in dirs {
                 let entry_path = entry.path();
-                let entry_name = entry_path
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                let new_rel_path = rel_path.join(&entry_name);
+                // Use normalize_path to get the correct relative path
+                let normalized_path = self.normalize_path(entry_path);
+                let new_rel_path = if normalized_path.components().count() > 0 {
+                    // If we have a normalized path, use it
+                    normalized_path
+                } else {
+                    // Otherwise, just join with the entry name
+                    let entry_name = entry_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    rel_path.join(&entry_name)
+                };
 
                 match self.scan_directory(entry_path, &new_rel_path) {
                     Ok(dir_node) => contents.push(Node::Directory(dir_node)),
@@ -249,6 +314,7 @@ impl Scanner {
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
+
         // Update the progress message with the filename
         // Truncate if too long to avoid display issues
         let display_name = if file_name.len() > 40 {
@@ -256,13 +322,35 @@ impl Scanner {
         } else {
             file_name.clone()
         };
-        self.progress
-            .set_message(format!("Current file: {}", display_name));
+
+        // Enhance display with repository context if applicable
+        let progress_message = if let Some(repo_info) = &self.config.git_repo {
+            format!(
+                "Current file: {}/{}/{}",
+                repo_info.owner, repo_info.name, display_name
+            )
+        } else {
+            format!("Current file: {}", display_name)
+        };
+
+        self.progress.set_message(progress_message);
 
         let file_type = self.get_file_type(abs_path)?;
         let metadata = self.get_metadata(abs_path)?;
-        // Use the relative path for reporting
-        let file_path = rel_path.to_string_lossy().to_string();
+
+        // Use the normalized path for reporting
+        let file_path = if let Some(repo_info) = &self.config.git_repo {
+            // For repositories, use the format owner/repo/path
+            format!(
+                "{}/{}/{}",
+                repo_info.owner,
+                repo_info.name,
+                rel_path.display()
+            )
+        } else {
+            // For local directories, use the relative path as is
+            rel_path.to_string_lossy().to_string()
+        };
 
         match file_type {
             FileType::TextFile => {
@@ -428,8 +516,8 @@ impl Scanner {
     /// Read the content of a text file and update statistics
     fn read_file_content(&self, path: &Path) -> io::Result<Option<String>> {
         let metadata = fs::metadata(path)?;
-        // Get the relative path from the full path
-        let file_path = path.to_string_lossy().to_string();
+        // Get the normalized path for reporting
+        let file_path = self.get_normalized_path_for_reporting(path);
 
         // Skip large files
         if metadata.len() > 1_048_576 {
@@ -524,5 +612,113 @@ impl Scanner {
         }
 
         Ok(Some(content))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use indicatif::ProgressBar;
+
+    use crate::config::{Config, GitCachePolicy};
+    use crate::git::{GitHost, GitRepoInfo};
+    use crate::scanner::Scanner;
+
+    #[test]
+    fn test_normalize_path() {
+        // Create a test config with a mock Git repository
+        let repo_path = PathBuf::from("/tmp/cache/dumpfs/github/username/repo");
+        let git_repo = GitRepoInfo {
+            url: "https://github.com/username/repo".to_string(),
+            host: GitHost::GitHub,
+            owner: "username".to_string(),
+            name: "repo".to_string(),
+            cache_path: repo_path.clone(),
+        };
+
+        let config = Config {
+            target_dir: repo_path.clone(),
+            output_file: PathBuf::from("output.xml"),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+            respect_gitignore: false,
+            gitignore_path: None,
+            model: None,
+            repo_url: Some("https://github.com/username/repo".to_string()),
+            git_repo: Some(git_repo),
+            git_cache_policy: GitCachePolicy::AlwaysPull,
+        };
+
+        let scanner = Scanner::new(config, Arc::new(ProgressBar::hidden()));
+
+        // Test paths at various depths
+        let test_cases = vec![
+            // Path in repo root should normalize to empty path or just filename
+            (repo_path.join("file.txt"), PathBuf::from("file.txt")),
+            // Path in subdirectory should be relative to repo root
+            (
+                repo_path.join("src").join("main.rs"),
+                PathBuf::from("src/main.rs"),
+            ),
+            // Path outside repo shouldn't change
+            (
+                PathBuf::from("/other/path/file.txt"),
+                PathBuf::from("/other/path/file.txt"),
+            ),
+        ];
+
+        for (input, expected) in test_cases {
+            let normalized = scanner.normalize_path(&input);
+            assert_eq!(normalized, expected);
+        }
+    }
+
+    #[test]
+    fn test_get_normalized_path_for_reporting() {
+        // Create a test config with a mock Git repository
+        let repo_path = PathBuf::from("/tmp/cache/dumpfs/github/username/repo");
+        let git_repo = GitRepoInfo {
+            url: "https://github.com/username/repo".to_string(),
+            host: GitHost::GitHub,
+            owner: "username".to_string(),
+            name: "repo".to_string(),
+            cache_path: repo_path.clone(),
+        };
+
+        let config = Config {
+            target_dir: repo_path.clone(),
+            output_file: PathBuf::from("output.xml"),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+            respect_gitignore: false,
+            gitignore_path: None,
+            model: None,
+            repo_url: Some("https://github.com/username/repo".to_string()),
+            git_repo: Some(git_repo),
+            git_cache_policy: GitCachePolicy::AlwaysPull,
+        };
+
+        let scanner = Scanner::new(config, Arc::new(ProgressBar::hidden()));
+
+        // Test path formatting for different types of paths
+        let root_path = repo_path.clone();
+        let src_path = repo_path.join("src").join("main.rs");
+
+        // Repository root should show as "username/repo"
+        let root_display = scanner.get_normalized_path_for_reporting(&root_path);
+        assert_eq!(root_display, "username/repo");
+
+        // File in repo should show as "username/repo/src/main.rs"
+        let src_display = scanner.get_normalized_path_for_reporting(&src_path);
+        assert_eq!(src_display, "username/repo/src/main.rs");
+
+        // Path outside repo should just use the full path
+        let other_path = PathBuf::from("/other/path/file.txt");
+        let other_display = scanner.get_normalized_path_for_reporting(&other_path);
+        assert_eq!(other_display, "/other/path/file.txt");
     }
 }

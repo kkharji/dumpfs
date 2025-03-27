@@ -10,6 +10,8 @@
 - Provides file metadata (size, modification time, permissions)
 - Supports pattern-based inclusion and exclusion of files
 - Respects `.gitignore` files for intelligent filtering
+- Supports Git repository URLs (GitHub, GitLab, Bitbucket, and more)
+- Automatically clones and manages repositories in a local cache
 - Parallel processing for better performance
 - Progress tracking with ETA and detailed file statistics
 - Beautiful Unicode progress display with real-time file information
@@ -31,7 +33,7 @@ The binary will be available at `target/release/dumpfs`.
 ## Usage
 
 ```
-dumpfs [DIRECTORY_PATH] [OUTPUT_FILE] [OPTIONS]
+dumpfs [DIRECTORY_PATH|GIT_URL] [OUTPUT_FILE] [OPTIONS]
 
 OPTIONS:
     --ignore-patterns <pattern1,pattern2,...>    Comma-separated list of patterns to ignore
@@ -41,6 +43,7 @@ OPTIONS:
     --gitignore-path <PATH>                      Path to custom .gitignore file
     --model <MODEL>                              LLM model to use for tokenization
     --generate <SHELL>                           Generate shell completions (bash, zsh, fish, etc.)
+    --clean-cache <DAYS>                         Clean Git repository cache older than DAYS (0 for all)
 ```
 
 ### Supported Models
@@ -112,6 +115,15 @@ dumpfs
 # Process specific directory with custom output file
 dumpfs /path/to/project project_context.xml
 
+# Process a GitHub repository
+dumpfs https://github.com/username/repo
+
+# Process a GitLab repository
+dumpfs https://gitlab.com/username/repo
+
+# Process a repository via SSH URL
+dumpfs git@github.com:username/repo.git
+
 # Ignore specific patterns
 dumpfs --ignore-patterns "*.log,*.tmp,*.bak"
 
@@ -129,7 +141,37 @@ dumpfs --gitignore-path /path/to/custom/gitignore
 
 # Use specific model for token counting with caching
 dumpfs --model gpt4o
+
+# Clean Git repository cache older than 30 days
+dumpfs --clean-cache 30
+
+# Clean all Git repository cache
+dumpfs --clean-cache 0
 ```
+
+## Git Repository Support
+
+`dumpfs` supports generating context directly from Git repositories by specifying a repository URL. The tool will clone the repository to a local cache directory (`~/.cache/dumpfs/`) and process it like a local directory.
+
+### Supported Repository URL Formats
+
+- GitHub: `https://github.com/username/repo` or `git@github.com:username/repo.git`
+- GitLab: `https://gitlab.com/username/repo` or `git@gitlab.com:username/repo.git`
+- Bitbucket: `https://bitbucket.org/username/repo` or `git@bitbucket.org:username/repo.git`
+- Other Git hosts: Any valid HTTP/HTTPS or SSH Git URL
+
+### Repository Caching
+
+Repositories are stored in the following locations, organized by hosting platform:
+
+- GitHub: `~/.cache/dumpfs/github/username/repo`
+- GitLab: `~/.cache/dumpfs/gitlab/username/repo`
+- Bitbucket: `~/.cache/dumpfs/bitbucket/username/repo`
+- Other: `~/.cache/dumpfs/git/hostname/username/repo`
+
+When processing a repository that's already in the cache, `dumpfs` will automatically update it with the latest changes from the remote.
+
+You can clean up old cached repositories using the `--clean-cache` option followed by the age in days. For example, `--clean-cache 30` will remove repositories that haven't been accessed in the last 30 days. Using `--clean-cache 0` will clean all cached repositories.
 
 ## GitIgnore Support
 
@@ -148,6 +190,13 @@ The tool generates an XML file with the following structure:
     <hostname>your-hostname</hostname>
     <os>linux</os>
     <kernel>unix</kernel>
+    <!-- Git repository information (if applicable) -->
+    <git_repository>
+      <url>https://github.com/username/repo</url>
+      <host>github.com</host>
+      <owner>username</owner>
+      <name>repo</name>
+    </git_repository>
   </system_info>
   <directory name="project" path="project">
     <metadata>

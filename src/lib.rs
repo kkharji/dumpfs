@@ -6,6 +6,7 @@
  */
 
 pub mod config;
+pub mod git;
 pub mod report;
 pub mod scanner;
 pub mod tokenizer;
@@ -23,6 +24,8 @@ pub use scanner::Scanner;
 pub use types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
 pub use utils::{count_files, format_file_size};
 pub use writer::XmlWriter;
+
+// No process_path export needed
 
 /// Version of the library
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

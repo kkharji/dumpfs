@@ -4,7 +4,7 @@
 
 use std::fs::{self, File};
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use indicatif::ProgressBar;
@@ -12,7 +12,9 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 use tempfile::tempdir;
 
-use crate::config::Config;
+use crate::config::{Config, GitCachePolicy};
+use crate::git::{GitHost, GitRepoInfo};
+// Git module imports not needed as tests are moved
 use crate::scanner::Scanner;
 use crate::writer::XmlWriter;
 
@@ -107,6 +109,9 @@ fn test_basic_scan() -> io::Result<()> {
         respect_gitignore: false,
         gitignore_path: None,
         model: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -151,6 +156,9 @@ fn test_ignore_patterns() -> io::Result<()> {
         respect_gitignore: false,
         model: None,
         gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -189,6 +197,9 @@ fn test_include_patterns() -> io::Result<()> {
         respect_gitignore: false,
         model: None,
         gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -227,6 +238,9 @@ fn test_large_file_handling() -> io::Result<()> {
         respect_gitignore: false,
         model: None,
         gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -261,6 +275,9 @@ fn test_xml_validity() -> io::Result<()> {
         model: None,
         respect_gitignore: false,
         gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -309,6 +326,9 @@ fn test_respect_gitignore() -> io::Result<()> {
         respect_gitignore: true,
         model: None,
         gitignore_path: None,
+        repo_url: None,
+        git_repo: None,
+        git_cache_policy: GitCachePolicy::AlwaysPull,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -331,4 +351,58 @@ fn test_respect_gitignore() -> io::Result<()> {
     assert!(xml_content.contains("not_ignored.md"));
 
     Ok(())
+}
+
+#[test]
+fn test_output_file_path_for_git_repo() {
+    // Create a mock GitRepoInfo
+    let repo_path = PathBuf::from("/tmp/cache/dumpfs/github/username/repo");
+    let git_repo = GitRepoInfo {
+        url: "https://github.com/username/repo".to_string(),
+        host: GitHost::GitHub,
+        owner: "username".to_string(),
+        name: "repo".to_string(),
+        cache_path: repo_path.clone(),
+    };
+
+    // Test cases for output file paths
+    let test_cases = vec![
+        // Relative file with no path component -> save to repo dir
+        (".dumpfs.context.xml", repo_path.join(".dumpfs.context.xml")),
+        // Relative file with path component -> keep as is
+        ("output/file.xml", PathBuf::from("output/file.xml")),
+        // Absolute path -> keep as is
+        ("/tmp/output.xml", PathBuf::from("/tmp/output.xml")),
+    ];
+
+    for (input, expected) in test_cases {
+        // Create a config with the test input
+        let mut config = Config {
+            target_dir: repo_path.clone(),
+            output_file: PathBuf::from(input),
+            ignore_patterns: vec![],
+            include_patterns: vec![],
+            num_threads: 1,
+            respect_gitignore: false,
+            gitignore_path: None,
+            model: None,
+            repo_url: Some("https://github.com/username/repo".to_string()),
+            git_repo: Some(git_repo.clone()),
+            git_cache_policy: GitCachePolicy::AlwaysPull,
+        };
+
+        // Apply output file path logic (simplified from main.rs)
+        if let Some(repo) = &config.git_repo {
+            let output_path = PathBuf::from(input);
+            if !output_path.is_absolute()
+                && (output_path.parent().is_none()
+                    || output_path.parent().unwrap() == Path::new(""))
+            {
+                config.output_file = repo.cache_path.join(output_path);
+            }
+        }
+
+        // Check if the path was adjusted correctly
+        assert_eq!(config.output_file, expected);
+    }
 }
