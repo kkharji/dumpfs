@@ -7,6 +7,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
+use crate::tokenizer::Model;
+
 /// Command-line arguments for DumpFS
 #[derive(Parser, Debug)]
 #[clap(
@@ -43,6 +45,10 @@ pub struct Args {
     /// Path to custom .gitignore file
     #[clap(long)]
     pub gitignore_path: Option<String>,
+    
+    /// LLM model to use for tokenization (enables token counting)
+    #[clap(long, value_enum)]
+    pub model: Option<Model>,
 }
 
 /// Application configuration
@@ -68,6 +74,9 @@ pub struct Config {
 
     /// Path to custom .gitignore file
     pub gitignore_path: Option<PathBuf>,
+    
+    /// LLM model to use for tokenization
+    pub model: Option<Model>,
 }
 
 impl Config {
@@ -81,6 +90,7 @@ impl Config {
             num_threads: args.threads,
             respect_gitignore: args.respect_gitignore,
             gitignore_path: args.gitignore_path.map(PathBuf::from),
+            model: args.model,
         }
     }
 

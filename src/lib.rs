@@ -8,6 +8,7 @@
 pub mod config;
 pub mod report;
 pub mod scanner;
+pub mod tokenizer;
 pub mod types;
 pub mod utils;
 pub mod writer;

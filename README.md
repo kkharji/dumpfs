@@ -14,6 +14,7 @@
 - Progress tracking with ETA and detailed file statistics
 - Beautiful Unicode progress display with real-time file information
 - Comprehensive summary of scanned content with LLM token estimation
+- Intelligent caching of tokenized files for faster processing
 
 ## Installation
 
@@ -38,7 +39,31 @@ OPTIONS:
     --threads <N>                                Number of threads to use for processing
     --respect-gitignore <BOOL>                   Whether to respect .gitignore files (default: true)
     --gitignore-path <PATH>                      Path to custom .gitignore file
+    --model <MODEL>                              LLM model to use for tokenization
 ```
+
+### Supported Models
+
+The `--model` option enables accurate token counting and caching. Supported models include:
+
+**OpenAI Models:**
+- `gpt-4` - GPT-4 (8K context window)
+- `gpt-4-turbo` - GPT-4 Turbo (128K context window)
+- `gpt4o` - GPT-4o (8K context window)
+
+**Anthropic Models:**
+- `sonnet-3.5` - Claude 3.5 Sonnet (200K context window)
+- `sonnet-3.7` - Claude 3.7 Sonnet (200K context window)
+
+**HuggingFace Models:**
+- `llama-2-7b` - Llama 2 7B (4K context window)
+- `llama-3-8b` - Llama 3 8B (8K context window)
+- `mistral-small` - Mistral Small (32K context window)
+- `mistral-small-24b` - Mistral Small 24B (128K context window)
+- `mistral-large` - Mistral Large (128K context window)
+- `pixtral-12b` - Pixtral 12B (128K context window)
+
+When a model is specified, `dumpfs` provides exact token counts instead of estimates and caches results for faster processing on subsequent runs.
 
 When running the command, you'll see a beautiful progress display showing:
 
@@ -73,6 +98,9 @@ dumpfs --respect-gitignore false
 
 # Use custom gitignore file
 dumpfs --gitignore-path /path/to/custom/gitignore
+
+# Use specific model for token counting with caching
+dumpfs --model gpt4o
 ```
 
 ## GitIgnore Support
@@ -139,27 +167,54 @@ When running `dumpfs`, you'll initially see scanning messages and a progress bar
 ╰────────────────┴───────┴─────────────╯
 
 ✅  EXTRACTION COMPLETE
-╭─────────────────────────┬─────────────────────╮
-│ Metric                  │ Value               │
-├─────────────────────────┼─────────────────────┤
-│ 📂 Output File          │ .dumpfs.context.xml │
-│ ⏱️ Process Time          │ 7.647ms             │
-│ 📄 Files Processed      │ 12                  │
-│ 📝 Total Lines          │ 2.1K                │
-│ 📦 Estimated LLM Tokens │ 16.7K tokens        │
-╰─────────────────────────┴─────────────────────╯
+╭────────────────────┬─────────────────────────────╮
+│ Metric             │ Value                       │
+├────────────────────┼─────────────────────────────┤
+│ 📂 Output File     │ .dumpfs.context.xml         │
+│ ⏱️ Process Time    │ 10.8125ms                   │
+│ 📄 Files Processed │ 12                          │
+│ 📝 Total Lines     │ 3.0K                        │
+│ 📦 LLM Tokens      │ 21.2K tokens (counted)      │
+│ 🔄 Cache Hit Rate  │ 100.0% (12 hits / 12 total) │
+╰────────────────────┴─────────────────────────────╯
 ```
 
 The output provides:
-- A detailed breakdown of each file with line counts and token estimates
+- A detailed breakdown of each file with line counts and token counts
 - File paths displayed relative to the project root
 - Human-readable numbers with K suffixes for large values
 - Total processing time with millisecond precision
 - Total number of files processed
 - Total line count
-- Estimated token usage for LLM context
+- Exact token usage for LLM context (when using a model)
+- Cache hit rate showing tokenization efficiency
 
 This information is particularly valuable when preparing context for LLMs, as it helps you understand the size and composition of the context you're providing.
+
+## Token Caching
+
+When using the `--model` option, dumpfs implements intelligent caching of tokenized content:
+
+- Only tokenizes files that haven't been processed before or have changed
+- Persists cache between runs in `~/.cache/dumpfs/[project_path].token_cache.json`
+- Automatically cleans up old cache entries (older than 7 days)
+- Reports cache hit rate in the output summary
+
+This caching mechanism significantly improves performance when running the tool multiple times on the same codebase, especially with API-based tokenizers like those from OpenAI or Anthropic.
+
+**First run with caching:**
+```
+📦 LLM Tokens      │ 21.2K tokens (counted)      │
+🔄 Cache Hit Rate  │ 0.0% (0 hits / 12 total)    │
+```
+
+**Subsequent runs:**
+```
+📦 LLM Tokens      │ 21.2K tokens (counted)      │
+🔄 Cache Hit Rate  │ 100.0% (12 hits / 12 total) │
+```
+
+Tokenization is often the most time-consuming part of the process, especially when using remote API-based tokenizers, so this caching mechanism can dramatically improve performance for repeated scans.
 
 ## License
 

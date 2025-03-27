@@ -37,10 +37,8 @@ fn main() -> io::Result<()> {
     // Create progress bar with advanced Unicode styling
     let progress = ProgressBar::new(0);
     progress.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white}\n[{bar:40.gradient(blue,cyan)}] {pos}/{len} ({percent}%)\n⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s")
-        .unwrap()
-        .progress_chars("█████ ")
-        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"));
+        .template("{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white} {pos}/{len} ({percent}%) ⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s")
+        .unwrap());
     progress.enable_steady_tick(std::time::Duration::from_millis(100));
     progress.set_prefix("📊 Setup");
 
@@ -102,7 +100,10 @@ fn main() -> io::Result<()> {
         files_processed: scanner_stats.files_processed,
         total_lines: scanner_stats.total_lines,
         total_chars: scanner_stats.total_chars,
+        total_tokens: scanner_stats.total_tokens,
         file_details: scanner_stats.file_details,
+        token_cache_hits: scanner_stats.token_cache_hits,
+        token_cache_misses: scanner_stats.token_cache_misses,
     };
 
     // Create a reporter and print the report

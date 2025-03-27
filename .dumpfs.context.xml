@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<directory_scan timestamp="2025-03-27T00:25:41.226068680+03:00">
+<directory_scan timestamp="2025-03-27T07:56:49.048943365+03:00">
   <system_info>
     <hostname>penzu</hostname>
     <os>linux</os>
@@ -8,138 +8,17 @@
   <directory name="dumpfs" path="dumpfs">
     <metadata>
       <size>142</size>
-      <modified>2025-03-27T00:23:59.136932894+03:00</modified>
+      <modified>2025-03-27T07:52:28.397941924+03:00</modified>
       <permissions>755</permissions>
     </metadata>
     <contents>
       <directory name="src" path="dumpfs/src">
         <metadata>
-          <size>148</size>
-          <modified>2025-03-26T23:40:31.846378173+03:00</modified>
+          <size>172</size>
+          <modified>2025-03-27T06:12:41.220223539+03:00</modified>
           <permissions>755</permissions>
         </metadata>
         <contents>
-          <file name="main.rs" path="dumpfs/src/main.rs">
-            <metadata>
-              <size>3528</size>
-              <modified>2025-03-27T00:25:03.924940764+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
-            <content>/*!
- * Command-line interface for DumpFS
- */
-
-use std::io;
-use std::sync::Arc;
-use std::time::Instant;
-
-use clap::Parser;
-use indicatif::{ProgressBar, ProgressStyle};
-use rayon::ThreadPoolBuilder;
-
-use dumpfs::config::{Args, Config};
-use dumpfs::report::{ReportFormat, Reporter, ScanReport};
-use dumpfs::scanner::Scanner;
-use dumpfs::utils::count_files;
-use dumpfs::writer::XmlWriter;
-
-fn main() -&gt; io::Result&lt;()&gt; {
-    // Parse command line arguments
-    let args = Args::parse();
-
-    // Create configuration
-    let config = Config::from_args(args);
-
-    // Validate configuration
-    config.validate()?;
-
-    // Configure thread pool
-    if let Err(e) = ThreadPoolBuilder::new()
-        .num_threads(config.num_threads)
-        .build_global()
-    {
-        eprintln!(&quot;Warning: Failed to set thread pool size: {}&quot;, e);
-    }
-
-    // Create progress bar with advanced Unicode styling
-    let progress = ProgressBar::new(0);
-    progress.set_style(ProgressStyle::default_bar()
-        .template(&quot;{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white}\n[{bar:40.gradient(blue,cyan)}] {pos}/{len} ({percent}%)\n⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s&quot;)
-        .unwrap()
-        .progress_chars(&quot;█████ &quot;)
-        .tick_chars(&quot;⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏&quot;));
-    progress.enable_steady_tick(std::time::Duration::from_millis(100));
-    progress.set_prefix(&quot;📊 Setup&quot;);
-
-    progress.set_message(format!(
-        &quot;📂 Scanning directory: {}&quot;,
-        config.target_dir.display()
-    ));
-
-    // Add gitignore status message
-    if config.respect_gitignore {
-        progress.set_message(match &amp;config.gitignore_path {
-            Some(path) =&gt; format!(&quot;🔍 Using custom gitignore file: {}&quot;, path.display()),
-            None =&gt; &quot;🔍 Respecting .gitignore files in the project&quot;.to_string(),
-        });
-    }
-
-    // Count files for progress tracking
-    let total_files = match count_files(&amp;config.target_dir, &amp;config) {
-        Ok(count) =&gt; {
-            progress.set_message(format!(&quot;🔎 Found {} files to process&quot;, count));
-            count
-        }
-        Err(e) =&gt; {
-            progress.set_message(format!(&quot;⚠️ Warning: Failed to count files: {}&quot;, e));
-            0
-        }
-    };
-
-    progress.set_length(total_files);
-    progress.set_prefix(&quot;📊 Processing&quot;);
-    progress.set_message(&quot;Starting scan...&quot;);
-
-    // Create scanner and writer
-    let scanner = Scanner::new(config.clone(), Arc::new(progress.clone()));
-    let writer = XmlWriter::new(config.clone());
-
-    // Start timing both scan and write operations
-    let start_time = Instant::now();
-
-    // Scan directory
-    let root_node = scanner.scan()?;
-
-    // Write XML output
-    writer.write(&amp;root_node)?;
-
-    // Calculate total duration (scan + write)
-    let total_duration = start_time.elapsed();
-
-    // Clear the progress bar
-    progress.finish_and_clear();
-
-    // Get scanner statistics
-    let scanner_stats = scanner.get_statistics();
-
-    // Prepare the scan report
-    let scan_report = ScanReport {
-        output_file: config.output_file.display().to_string(),
-        duration: total_duration,
-        files_processed: scanner_stats.files_processed,
-        total_lines: scanner_stats.total_lines,
-        total_chars: scanner_stats.total_chars,
-        file_details: scanner_stats.file_details,
-    };
-
-    // Create a reporter and print the report
-    let reporter = Reporter::new(ReportFormat::ConsoleTable);
-    reporter.print_report(&amp;scan_report);
-
-    Ok(())
-}
-</content>
-          </file>
           <file name="types.rs" path="dumpfs/src/types.rs">
             <metadata>
               <size>2152</size>
@@ -240,133 +119,6 @@ pub enum Node {
     Binary(BinaryNode),
     /// Symbolic link node
     Symlink(SymlinkNode),
-}
-</content>
-          </file>
-          <file name="config.rs" path="dumpfs/src/config.rs">
-            <metadata>
-              <size>3660</size>
-              <modified>2025-03-27T00:25:03.912940762+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
-            <content>/*!
- * Configuration handling for DumpFS
- */
-
-use std::io;
-use std::path::PathBuf;
-
-use clap::Parser;
-
-/// Command-line arguments for DumpFS
-#[derive(Parser, Debug)]
-#[clap(
-    name = &quot;dumpfs&quot;,
-    version = env!(&quot;CARGO_PKG_VERSION&quot;),
-    about = &quot;Generate XML representation of directory contents for LLM context&quot;,
-    long_about = &quot;Creates an XML representation of a directory structure and its contents, designed for providing context to Large Language Models (LLMs).&quot;
-)]
-pub struct Args {
-    /// Target directory to process
-    #[clap(default_value = &quot;.&quot;)]
-    pub directory_path: String,
-
-    /// Output XML file name
-    #[clap(default_value = &quot;.dumpfs.context.xml&quot;)]
-    pub output_file: String,
-
-    /// Comma-separated list of patterns to ignore
-    #[clap(long, value_delimiter = &apos;,&apos;)]
-    pub ignore_patterns: Vec&lt;String&gt;,
-
-    /// Comma-separated list of patterns to include (if specified, only matching files are included)
-    #[clap(long, value_delimiter = &apos;,&apos;)]
-    pub include_patterns: Vec&lt;String&gt;,
-
-    /// Number of threads to use for processing
-    #[clap(long, default_value = &quot;4&quot;)]
-    pub threads: usize,
-
-    /// Respect .gitignore files (default: true)
-    #[clap(long, default_value = &quot;true&quot;)]
-    pub respect_gitignore: bool,
-
-    /// Path to custom .gitignore file
-    #[clap(long)]
-    pub gitignore_path: Option&lt;String&gt;,
-}
-
-/// Application configuration
-#[derive(Clone, Debug)]
-pub struct Config {
-    /// Target directory to process
-    pub target_dir: PathBuf,
-
-    /// Output XML file path
-    pub output_file: PathBuf,
-
-    /// Patterns to ignore
-    pub ignore_patterns: Vec&lt;String&gt;,
-
-    /// Patterns to include (if empty, include all)
-    pub include_patterns: Vec&lt;String&gt;,
-
-    /// Number of threads to use for processing
-    pub num_threads: usize,
-
-    /// Whether to respect .gitignore files
-    pub respect_gitignore: bool,
-
-    /// Path to custom .gitignore file
-    pub gitignore_path: Option&lt;PathBuf&gt;,
-}
-
-impl Config {
-    /// Create configuration from command-line arguments
-    pub fn from_args(args: Args) -&gt; Self {
-        Self {
-            target_dir: PathBuf::from(args.directory_path),
-            output_file: PathBuf::from(args.output_file),
-            ignore_patterns: args.ignore_patterns,
-            include_patterns: args.include_patterns,
-            num_threads: args.threads,
-            respect_gitignore: args.respect_gitignore,
-            gitignore_path: args.gitignore_path.map(PathBuf::from),
-        }
-    }
-
-    /// Validate the configuration
-    pub fn validate(&amp;self) -&gt; io::Result&lt;()&gt; {
-        // Check if target directory exists and is readable
-        if !self.target_dir.exists() || !self.target_dir.is_dir() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!(&quot;Target directory not found: {}&quot;, self.target_dir.display()),
-            ));
-        }
-
-        // Check if output file directory exists and is writable
-        if let Some(parent) = self.output_file.parent() {
-            if !parent.exists() &amp;&amp; parent != PathBuf::from(&quot;&quot;) {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!(&quot;Output directory not found: {}&quot;, parent.display()),
-                ));
-            }
-        }
-
-        // Check if custom gitignore file exists
-        if let Some(path) = &amp;self.gitignore_path {
-            if !path.exists() {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!(&quot;Custom .gitignore file not found: {}&quot;, path.display()),
-                ));
-            }
-        }
-
-        Ok(())
-    }
 }
 </content>
           </file>
@@ -589,8 +341,8 @@ pub static DEFAULT_IGNORE: Lazy&lt;Vec&lt;&amp;&apos;static str&gt;&gt; = Lazy::
           </file>
           <file name="scanner.rs" path="dumpfs/src/scanner.rs">
             <metadata>
-              <size>16254</size>
-              <modified>2025-03-27T00:20:30.848916581+03:00</modified>
+              <size>18794</size>
+              <modified>2025-03-27T07:53:46.788829583+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -615,6 +367,7 @@ use crate::types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node
 use crate::utils::{format_file_size, DEFAULT_IGNORE};
 
 use crate::report::FileReportInfo;
+use crate::tokenizer::{create_tokenizer, Tokenizer};
 
 /// Scanner statistics
 #[derive(Debug, Clone, Default)]
@@ -625,8 +378,14 @@ pub struct ScannerStatistics {
     pub total_lines: usize,
     /// Total number of characters
     pub total_chars: usize,
+    /// Total number of tokens (if tokenizer is enabled)
+    pub total_tokens: Option&lt;usize&gt;,
     /// Details for each file
     pub file_details: HashMap&lt;String, FileReportInfo&gt;,
+    /// Token cache hits (if tokenizer caching is enabled)
+    pub token_cache_hits: Option&lt;usize&gt;,
+    /// Token cache misses (if tokenizer caching is enabled)
+    pub token_cache_misses: Option&lt;usize&gt;,
 }
 
 /// Scanner for directory contents
@@ -637,21 +396,50 @@ pub struct Scanner {
     pub progress: Arc&lt;ProgressBar&gt;,
     /// Scanner statistics
     statistics: Arc&lt;Mutex&lt;ScannerStatistics&gt;&gt;,
+    /// Tokenizer (if enabled)
+    tokenizer: Option&lt;Box&lt;dyn Tokenizer&gt;&gt;,
 }
 
 impl Scanner {
     /// Create a new scanner
     pub fn new(config: Config, progress: Arc&lt;ProgressBar&gt;) -&gt; Self {
+        // Create tokenizer if model is specified
+        let tokenizer = if let Some(model) = config.model {
+            let project_dir = config.target_dir.to_string_lossy().to_string();
+            match create_tokenizer(model, &amp;project_dir) {
+                Ok(t) =&gt; {
+                    progress.set_message(format!(&quot;Using tokenizer for model: {model:?}&quot;));
+                    Some(t)
+                }
+                Err(e) =&gt; {
+                    eprintln!(&quot;Error creating tokenizer: {}&quot;, e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Self {
             config,
             progress,
             statistics: Arc::new(Mutex::new(ScannerStatistics::default())),
+            tokenizer,
         }
     }
 
     /// Get scanner statistics
     pub fn get_statistics(&amp;self) -&gt; ScannerStatistics {
-        self.statistics.lock().unwrap().clone()
+        let mut stats = self.statistics.lock().unwrap().clone();
+        
+        // If we have a tokenizer, get cache stats from global counters
+        if self.tokenizer.is_some() {
+            let (hits, misses) = crate::tokenizer::CachedTokenizer::get_global_cache_stats();
+            stats.token_cache_hits = Some(hits);
+            stats.token_cache_misses = Some(misses);
+        }
+        
+        stats
     }
 
     /// Scan the target directory and return the directory tree
@@ -838,9 +626,14 @@ impl Scanner {
                 {
                     let mut stats = self.statistics.lock().unwrap();
                     stats.files_processed += 1;
-                    stats
-                        .file_details
-                        .insert(file_path, FileReportInfo { lines: 0, chars: 0 });
+                    stats.file_details.insert(
+                        file_path,
+                        FileReportInfo {
+                            lines: 0,
+                            chars: 0,
+                            tokens: None,
+                        },
+                    );
                 }
 
                 Ok(Node::Binary(BinaryNode {
@@ -861,6 +654,7 @@ impl Scanner {
                         FileReportInfo {
                             lines: 0,
                             chars: target.chars().count(),
+                            tokens: None,
                         },
                     );
                 }
@@ -996,9 +790,14 @@ impl Scanner {
             {
                 let mut stats = self.statistics.lock().unwrap();
                 stats.files_processed += 1;
-                stats
-                    .file_details
-                    .insert(file_path, FileReportInfo { lines: 0, chars: 0 });
+                stats.file_details.insert(
+                    file_path,
+                    FileReportInfo {
+                        lines: 0,
+                        chars: 0,
+                        tokens: None,
+                    },
+                );
             }
 
             return Ok(Some(message));
@@ -1031,17 +830,37 @@ impl Scanner {
                     return Ok(Some(format!(&quot;Failed to read file content: {}&quot;, e)));
                 }
 
+                // Count tokens if tokenizer is enabled
+                let token_count = if let Some(tokenizer) = &amp;self.tokenizer {
+                    match tokenizer.count_tokens(&amp;content) {
+                        Ok(count) =&gt; Some(count.tokens),
+                        Err(e) =&gt; {
+                            eprintln!(&quot;Error counting tokens for {}: {}&quot;, path.display(), e);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
                 // Update statistics
                 {
                     let mut stats = self.statistics.lock().unwrap();
                     stats.files_processed += 1;
                     stats.total_lines += line_count;
                     stats.total_chars += char_count;
+
+                    // Update token count if available
+                    if let Some(tokens) = token_count {
+                        stats.total_tokens = Some(stats.total_tokens.unwrap_or(0) + tokens);
+                    }
+
                     stats.file_details.insert(
                         file_path,
                         FileReportInfo {
                             lines: line_count,
                             chars: char_count,
+                            tokens: token_count,
                         },
                     );
                 }
@@ -1277,10 +1096,147 @@ impl XmlWriter {
 }
 </content>
           </file>
+          <file name="config.rs" path="dumpfs/src/config.rs">
+            <metadata>
+              <size>3930</size>
+              <modified>2025-03-27T06:20:43.378840659+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Configuration handling for DumpFS
+ */
+
+use std::io;
+use std::path::PathBuf;
+
+use clap::Parser;
+
+use crate::tokenizer::Model;
+
+/// Command-line arguments for DumpFS
+#[derive(Parser, Debug)]
+#[clap(
+    name = &quot;dumpfs&quot;,
+    version = env!(&quot;CARGO_PKG_VERSION&quot;),
+    about = &quot;Generate XML representation of directory contents for LLM context&quot;,
+    long_about = &quot;Creates an XML representation of a directory structure and its contents, designed for providing context to Large Language Models (LLMs).&quot;
+)]
+pub struct Args {
+    /// Target directory to process
+    #[clap(default_value = &quot;.&quot;)]
+    pub directory_path: String,
+
+    /// Output XML file name
+    #[clap(default_value = &quot;.dumpfs.context.xml&quot;)]
+    pub output_file: String,
+
+    /// Comma-separated list of patterns to ignore
+    #[clap(long, value_delimiter = &apos;,&apos;)]
+    pub ignore_patterns: Vec&lt;String&gt;,
+
+    /// Comma-separated list of patterns to include (if specified, only matching files are included)
+    #[clap(long, value_delimiter = &apos;,&apos;)]
+    pub include_patterns: Vec&lt;String&gt;,
+
+    /// Number of threads to use for processing
+    #[clap(long, default_value = &quot;4&quot;)]
+    pub threads: usize,
+
+    /// Respect .gitignore files (default: true)
+    #[clap(long, default_value = &quot;true&quot;)]
+    pub respect_gitignore: bool,
+
+    /// Path to custom .gitignore file
+    #[clap(long)]
+    pub gitignore_path: Option&lt;String&gt;,
+    
+    /// LLM model to use for tokenization (enables token counting)
+    #[clap(long, value_enum)]
+    pub model: Option&lt;Model&gt;,
+}
+
+/// Application configuration
+#[derive(Clone, Debug)]
+pub struct Config {
+    /// Target directory to process
+    pub target_dir: PathBuf,
+
+    /// Output XML file path
+    pub output_file: PathBuf,
+
+    /// Patterns to ignore
+    pub ignore_patterns: Vec&lt;String&gt;,
+
+    /// Patterns to include (if empty, include all)
+    pub include_patterns: Vec&lt;String&gt;,
+
+    /// Number of threads to use for processing
+    pub num_threads: usize,
+
+    /// Whether to respect .gitignore files
+    pub respect_gitignore: bool,
+
+    /// Path to custom .gitignore file
+    pub gitignore_path: Option&lt;PathBuf&gt;,
+    
+    /// LLM model to use for tokenization
+    pub model: Option&lt;Model&gt;,
+}
+
+impl Config {
+    /// Create configuration from command-line arguments
+    pub fn from_args(args: Args) -&gt; Self {
+        Self {
+            target_dir: PathBuf::from(args.directory_path),
+            output_file: PathBuf::from(args.output_file),
+            ignore_patterns: args.ignore_patterns,
+            include_patterns: args.include_patterns,
+            num_threads: args.threads,
+            respect_gitignore: args.respect_gitignore,
+            gitignore_path: args.gitignore_path.map(PathBuf::from),
+            model: args.model,
+        }
+    }
+
+    /// Validate the configuration
+    pub fn validate(&amp;self) -&gt; io::Result&lt;()&gt; {
+        // Check if target directory exists and is readable
+        if !self.target_dir.exists() || !self.target_dir.is_dir() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(&quot;Target directory not found: {}&quot;, self.target_dir.display()),
+            ));
+        }
+
+        // Check if output file directory exists and is writable
+        if let Some(parent) = self.output_file.parent() {
+            if !parent.exists() &amp;&amp; parent != PathBuf::from(&quot;&quot;) {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(&quot;Output directory not found: {}&quot;, parent.display()),
+                ));
+            }
+        }
+
+        // Check if custom gitignore file exists
+        if let Some(path) = &amp;self.gitignore_path {
+            if !path.exists() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(&quot;Custom .gitignore file not found: {}&quot;, path.display()),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+}
+</content>
+          </file>
           <file name="lib.rs" path="dumpfs/src/lib.rs">
             <metadata>
-              <size>753</size>
-              <modified>2025-03-27T00:25:03.913940762+03:00</modified>
+              <size>772</size>
+              <modified>2025-03-27T06:17:11.276690794+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -1293,6 +1249,7 @@ impl XmlWriter {
 pub mod config;
 pub mod report;
 pub mod scanner;
+pub mod tokenizer;
 pub mod types;
 pub mod utils;
 pub mod writer;
@@ -1312,355 +1269,132 @@ pub use writer::XmlWriter;
 pub const VERSION: &amp;str = env!(&quot;CARGO_PKG_VERSION&quot;);
 </content>
           </file>
-          <file name="tests.rs" path="dumpfs/src/tests.rs">
+          <file name="main.rs" path="dumpfs/src/main.rs">
             <metadata>
-              <size>11423</size>
-              <modified>2025-03-27T00:25:03.919940763+03:00</modified>
+              <size>3567</size>
+              <modified>2025-03-27T07:37:18.626274561+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
- * Tests for DumpFS functionality
+ * Command-line interface for DumpFS
  */
 
-#[cfg(test)]
-mod tests {
-    use std::fs::{self, File};
-    use std::io::{self, Write};
-    use std::path::Path;
-    use std::sync::Arc;
+use std::io;
+use std::sync::Arc;
+use std::time::Instant;
 
-    use indicatif::ProgressBar;
-    use quick_xml::events::Event;
-    use quick_xml::Reader;
-    use tempfile::tempdir;
+use clap::Parser;
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::ThreadPoolBuilder;
 
-    use crate::config::Config;
-    use crate::scanner::Scanner;
-    use crate::writer::XmlWriter;
+use dumpfs::config::{Args, Config};
+use dumpfs::report::{ReportFormat, Reporter, ScanReport};
+use dumpfs::scanner::Scanner;
+use dumpfs::utils::count_files;
+use dumpfs::writer::XmlWriter;
 
-    // Helper function to create a test directory structure
-    fn setup_test_directory() -&gt; io::Result&lt;tempfile::TempDir&gt; {
-        let temp_dir = tempdir()?;
+fn main() -&gt; io::Result&lt;()&gt; {
+    // Parse command line arguments
+    let args = Args::parse();
 
-        // Create a simple directory structure
-        fs::create_dir(temp_dir.path().join(&quot;dir1&quot;))?;
-        fs::create_dir(temp_dir.path().join(&quot;dir2&quot;))?;
-        fs::create_dir(temp_dir.path().join(&quot;dir1&quot;).join(&quot;subdir&quot;))?;
+    // Create configuration
+    let config = Config::from_args(args);
 
-        // Create text files
-        let mut file1 = File::create(temp_dir.path().join(&quot;file1.txt&quot;))?;
-        writeln!(file1, &quot;This is a text file with content&quot;)?;
+    // Validate configuration
+    config.validate()?;
 
-        let mut file2 = File::create(temp_dir.path().join(&quot;dir1&quot;).join(&quot;file2.txt&quot;))?;
-        writeln!(file2, &quot;This is another text file\nwith multiple lines&quot;)?;
-
-        let mut file3 = File::create(
-            temp_dir
-                .path()
-                .join(&quot;dir1&quot;)
-                .join(&quot;subdir&quot;)
-                .join(&quot;file3.txt&quot;),
-        )?;
-        writeln!(file3, &quot;Nested file content&quot;)?;
-
-        // Create files to be ignored
-        fs::create_dir(temp_dir.path().join(&quot;.git&quot;))?;
-        let mut git_file = File::create(temp_dir.path().join(&quot;.git&quot;).join(&quot;config&quot;))?;
-        writeln!(git_file, &quot;[core]\n\trepositoryformatversion = 0&quot;)?;
-
-        // Create a binary file
-        let mut bin_file = File::create(temp_dir.path().join(&quot;binary.bin&quot;))?;
-        bin_file.write_all(&amp;[0u8, 1u8, 2u8, 3u8])?;
-
-        // Create a symlink if not on Windows
-        #[cfg(not(target_os = &quot;windows&quot;))]
-        std::os::unix::fs::symlink(
-            temp_dir.path().join(&quot;file1.txt&quot;),
-            temp_dir.path().join(&quot;symlink.txt&quot;),
-        )?;
-
-        Ok(temp_dir)
+    // Configure thread pool
+    if let Err(e) = ThreadPoolBuilder::new()
+        .num_threads(config.num_threads)
+        .build_global()
+    {
+        eprintln!(&quot;Warning: Failed to set thread pool size: {}&quot;, e);
     }
 
-    // Helper function to create a test directory with a .gitignore file
-    fn setup_gitignore_test_directory() -&gt; io::Result&lt;tempfile::TempDir&gt; {
-        let temp_dir = setup_test_directory()?;
+    // Create progress bar with advanced Unicode styling
+    let progress = ProgressBar::new(0);
+    progress.set_style(ProgressStyle::default_bar()
+        .template(&quot;{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white} {pos}/{len} ({percent}%) ⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s&quot;)
+        .unwrap());
+    progress.enable_steady_tick(std::time::Duration::from_millis(100));
+    progress.set_prefix(&quot;📊 Setup&quot;);
 
-        // Create a .gitignore file
-        let mut gitignore = File::create(temp_dir.path().join(&quot;.gitignore&quot;))?;
-        writeln!(gitignore, &quot;# Ignore all .txt files&quot;)?;
-        writeln!(gitignore, &quot;*.txt&quot;)?;
-        writeln!(gitignore, &quot;# Ignore binary.bin&quot;)?;
-        writeln!(gitignore, &quot;binary.bin&quot;)?;
+    progress.set_message(format!(
+        &quot;📂 Scanning directory: {}&quot;,
+        config.target_dir.display()
+    ));
 
-        // Create some additional files that aren&apos;t explicitly ignored
-        let mut not_ignored = File::create(temp_dir.path().join(&quot;not_ignored.md&quot;))?;
-        writeln!(not_ignored, &quot;# This file shouldn&apos;t be ignored&quot;)?;
-
-        Ok(temp_dir)
+    // Add gitignore status message
+    if config.respect_gitignore {
+        progress.set_message(match &amp;config.gitignore_path {
+            Some(path) =&gt; format!(&quot;🔍 Using custom gitignore file: {}&quot;, path.display()),
+            None =&gt; &quot;🔍 Respecting .gitignore files in the project&quot;.to_string(),
+        });
     }
 
-    // Helper function to create a large file (&gt;1MB)
-    fn create_large_file(dir: &amp;Path) -&gt; io::Result&lt;()&gt; {
-        let path = dir.join(&quot;large_file.txt&quot;);
-        let mut file = File::create(path)?;
-
-        // Write over 1MB of data
-        let line =
-            &quot;This is a line of text that will be repeated many times to create a large file.\n&quot;;
-        for _ in 0..20000 {
-            file.write_all(line.as_bytes())?;
+    // Count files for progress tracking
+    let total_files = match count_files(&amp;config.target_dir, &amp;config) {
+        Ok(count) =&gt; {
+            progress.set_message(format!(&quot;🔎 Found {} files to process&quot;, count));
+            count
         }
-
-        Ok(())
-    }
-
-    // Test basic scanning functionality
-    #[test]
-    fn test_basic_scan() -&gt; io::Result&lt;()&gt; {
-        let temp_dir = setup_test_directory()?;
-        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
-
-        let config = Config {
-            target_dir: temp_dir.path().to_path_buf(),
-            output_file: output_file.clone(),
-            ignore_patterns: vec![],
-            include_patterns: vec![],
-            num_threads: 1,
-            respect_gitignore: false,
-            gitignore_path: None,
-        };
-
-        let progress = Arc::new(ProgressBar::hidden());
-        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
-        let writer = XmlWriter::new(config);
-
-        let root_node = scanner.scan()?;
-        writer.write(&amp;root_node)?;
-
-        // Check that the output file exists
-        assert!(output_file.exists());
-
-        // Read the XML file to verify structure
-        let xml_content = fs::read_to_string(&amp;output_file)?;
-
-        // Check basic structure
-        assert!(xml_content.contains(&quot;&lt;directory_scan&quot;));
-        assert!(xml_content.contains(&quot;&lt;system_info&gt;&quot;));
-        assert!(xml_content.contains(&quot;&lt;hostname&gt;&quot;));
-        assert!(xml_content.contains(&quot;&lt;directory name=&quot;));
-        assert!(xml_content.contains(&quot;&lt;file name=\&quot;file1.txt\&quot;&quot;));
-        assert!(xml_content.contains(&quot;This is a text file with content&quot;));
-
-        // The .git directory should be ignored by default
-        assert!(!xml_content.contains(&quot;.git&quot;));
-
-        Ok(())
-    }
-
-    // Test ignore patterns
-    #[test]
-    fn test_ignore_patterns() -&gt; io::Result&lt;()&gt; {
-        let temp_dir = setup_test_directory()?;
-        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
-
-        let config = Config {
-            target_dir: temp_dir.path().to_path_buf(),
-            output_file: output_file.clone(),
-            ignore_patterns: vec![&quot;*.txt&quot;.to_string()],
-            include_patterns: vec![],
-            num_threads: 1,
-            respect_gitignore: false,
-            gitignore_path: None,
-        };
-
-        let progress = Arc::new(ProgressBar::hidden());
-        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
-        let writer = XmlWriter::new(config);
-
-        let root_node = scanner.scan()?;
-        writer.write(&amp;root_node)?;
-
-        // Read the XML file
-        let xml_content = fs::read_to_string(&amp;output_file)?;
-
-        // All .txt files should be ignored
-        assert!(!xml_content.contains(&quot;file1.txt&quot;));
-        assert!(!xml_content.contains(&quot;file2.txt&quot;));
-        assert!(!xml_content.contains(&quot;file3.txt&quot;));
-
-        // The binary file should still be included
-        assert!(xml_content.contains(&quot;binary.bin&quot;));
-
-        Ok(())
-    }
-
-    // Test include patterns
-    #[test]
-    fn test_include_patterns() -&gt; io::Result&lt;()&gt; {
-        let temp_dir = setup_test_directory()?;
-        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
-
-        let config = Config {
-            target_dir: temp_dir.path().to_path_buf(),
-            output_file: output_file.clone(),
-            ignore_patterns: vec![],
-            include_patterns: vec![&quot;*.bin&quot;.to_string()],
-            num_threads: 1,
-            respect_gitignore: false,
-            gitignore_path: None,
-        };
-
-        let progress = Arc::new(ProgressBar::hidden());
-        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
-        let writer = XmlWriter::new(config);
-
-        let root_node = scanner.scan()?;
-        writer.write(&amp;root_node)?;
-
-        // Read the XML file
-        let xml_content = fs::read_to_string(&amp;output_file)?;
-
-        // Only .bin files should be included
-        assert!(!xml_content.contains(&quot;file1.txt&quot;));
-        assert!(!xml_content.contains(&quot;file2.txt&quot;));
-        assert!(!xml_content.contains(&quot;file3.txt&quot;));
-        assert!(xml_content.contains(&quot;binary.bin&quot;));
-
-        Ok(())
-    }
-
-    // Test handling of large files
-    #[test]
-    fn test_large_file_handling() -&gt; io::Result&lt;()&gt; {
-        let temp_dir = setup_test_directory()?;
-        create_large_file(temp_dir.path())?;
-
-        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
-
-        let config = Config {
-            target_dir: temp_dir.path().to_path_buf(),
-            output_file: output_file.clone(),
-            ignore_patterns: vec![],
-            include_patterns: vec![],
-            num_threads: 1,
-            respect_gitignore: false,
-            gitignore_path: None,
-        };
-
-        let progress = Arc::new(ProgressBar::hidden());
-        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
-        let writer = XmlWriter::new(config);
-
-        let root_node = scanner.scan()?;
-        writer.write(&amp;root_node)?;
-
-        // Read the XML file
-        let xml_content = fs::read_to_string(&amp;output_file)?;
-
-        // Large file should be mentioned but content should be truncated
-        assert!(xml_content.contains(&quot;large_file.txt&quot;));
-        assert!(xml_content.contains(&quot;File too large to include content&quot;));
-
-        Ok(())
-    }
-
-    // Test XML structure validity
-    #[test]
-    fn test_xml_validity() -&gt; io::Result&lt;()&gt; {
-        let temp_dir = setup_test_directory()?;
-        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
-
-        let config = Config {
-            target_dir: temp_dir.path().to_path_buf(),
-            output_file: output_file.clone(),
-            ignore_patterns: vec![],
-            include_patterns: vec![],
-            num_threads: 1,
-            respect_gitignore: false,
-            gitignore_path: None,
-        };
-
-        let progress = Arc::new(ProgressBar::hidden());
-        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
-        let writer = XmlWriter::new(config);
-
-        let root_node = scanner.scan()?;
-        writer.write(&amp;root_node)?;
-
-        // Parse the XML file to verify it&apos;s well-formed
-        let file_content = fs::read_to_string(&amp;output_file)?;
-        let mut reader = Reader::from_str(&amp;file_content);
-
-        let mut depth = 0;
-        let mut buf = Vec::new();
-
-        loop {
-            match reader.read_event_into(&amp;mut buf) {
-                Ok(Event::Start(_)) =&gt; depth += 1,
-                Ok(Event::End(_)) =&gt; depth -= 1,
-                Ok(Event::Eof) =&gt; break,
-                Err(e) =&gt; panic!(&quot;Error parsing XML: {}&quot;, e),
-                _ =&gt; (),
-            }
-            buf.clear();
+        Err(e) =&gt; {
+            progress.set_message(format!(&quot;⚠️ Warning: Failed to count files: {}&quot;, e));
+            0
         }
+    };
 
-        // If XML is well-formed, depth should be 0 at the end
-        assert_eq!(depth, 0, &quot;XML structure is not well-balanced&quot;);
+    progress.set_length(total_files);
+    progress.set_prefix(&quot;📊 Processing&quot;);
+    progress.set_message(&quot;Starting scan...&quot;);
 
-        Ok(())
-    }
+    // Create scanner and writer
+    let scanner = Scanner::new(config.clone(), Arc::new(progress.clone()));
+    let writer = XmlWriter::new(config.clone());
 
-    // Test respecting .gitignore files
-    #[test]
-    fn test_respect_gitignore() -&gt; io::Result&lt;()&gt; {
-        let temp_dir = setup_gitignore_test_directory()?;
-        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+    // Start timing both scan and write operations
+    let start_time = Instant::now();
 
-        let config = Config {
-            target_dir: temp_dir.path().to_path_buf(),
-            output_file: output_file.clone(),
-            ignore_patterns: vec![],
-            include_patterns: vec![],
-            num_threads: 1,
-            respect_gitignore: true,
-            gitignore_path: None,
-        };
+    // Scan directory
+    let root_node = scanner.scan()?;
 
-        let progress = Arc::new(ProgressBar::hidden());
-        let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
-        let writer = XmlWriter::new(config);
+    // Write XML output
+    writer.write(&amp;root_node)?;
 
-        let root_node = scanner.scan()?;
-        writer.write(&amp;root_node)?;
+    // Calculate total duration (scan + write)
+    let total_duration = start_time.elapsed();
 
-        // Read the XML file
-        let xml_content = fs::read_to_string(&amp;output_file)?;
+    // Clear the progress bar
+    progress.finish_and_clear();
 
-        // Files excluded by .gitignore should not be present
-        assert!(!xml_content.contains(&quot;file1.txt&quot;));
-        assert!(!xml_content.contains(&quot;file2.txt&quot;));
-        assert!(!xml_content.contains(&quot;file3.txt&quot;));
-        assert!(!xml_content.contains(&quot;binary.bin&quot;));
+    // Get scanner statistics
+    let scanner_stats = scanner.get_statistics();
 
-        // Files not excluded by .gitignore should be present
-        assert!(xml_content.contains(&quot;not_ignored.md&quot;));
+    // Prepare the scan report
+    let scan_report = ScanReport {
+        output_file: config.output_file.display().to_string(),
+        duration: total_duration,
+        files_processed: scanner_stats.files_processed,
+        total_lines: scanner_stats.total_lines,
+        total_chars: scanner_stats.total_chars,
+        total_tokens: scanner_stats.total_tokens,
+        file_details: scanner_stats.file_details,
+        token_cache_hits: scanner_stats.token_cache_hits,
+        token_cache_misses: scanner_stats.token_cache_misses,
+    };
 
-        Ok(())
-    }
+    // Create a reporter and print the report
+    let reporter = Reporter::new(ReportFormat::ConsoleTable);
+    reporter.print_report(&amp;scan_report);
 
-    // Skip the custom gitignore test for now as it requires more complex setup
-    // that&apos;s difficult to reliably implement in a test environment
-    // The test_respect_gitignore test above already verifies that .gitignore
-    // files are respected, which is the main functionality we care about
+    Ok(())
 }
 </content>
           </file>
           <file name="report.rs" path="dumpfs/src/report.rs">
             <metadata>
-              <size>8163</size>
-              <modified>2025-03-27T00:24:33.955936931+03:00</modified>
+              <size>9559</size>
+              <modified>2025-03-27T07:37:27.047277263+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -1685,6 +1419,8 @@ pub struct FileReportInfo {
     pub lines: usize,
     /// Number of characters in the file
     pub chars: usize,
+    /// Number of tokens in the file (if tokenizer is enabled)
+    pub tokens: Option&lt;usize&gt;,
 }
 
 /// Statistics for a directory scan
@@ -1700,8 +1436,14 @@ pub struct ScanReport {
     pub total_lines: usize,
     /// Total number of characters
     pub total_chars: usize,
+    /// Total number of tokens (if tokenizer is enabled)
+    pub total_tokens: Option&lt;usize&gt;,
     /// Details for each file
     pub file_details: HashMap&lt;String, FileReportInfo&gt;,
+    /// Token cache hits (if tokenizer caching is enabled)
+    pub token_cache_hits: Option&lt;usize&gt;,
+    /// Token cache misses (if tokenizer caching is enabled)
+    pub token_cache_misses: Option&lt;usize&gt;,
 }
 
 /// Format of the report output
@@ -1835,16 +1577,33 @@ impl Reporter {
             value: self.format_number(report.total_lines),
         });
 
-        // Calculate token estimate
-        let estimated_tokens = report.total_chars / 4;
-        let formatted_tokens = self.format_number(estimated_tokens);
-
-        let token_usage = format!(&quot;{} tokens&quot;, formatted_tokens);
+        // Use actual token count if available, otherwise use estimate
+        let token_text = if let Some(tokens) = report.total_tokens {
+            format!(&quot;{} tokens (counted)&quot;, self.format_number(tokens))
+        } else {
+            let estimated_tokens = report.total_chars / 4;
+            format!(&quot;{} tokens (estimated)&quot;, self.format_number(estimated_tokens))
+        };
 
         rows.push(SummaryRow {
-            key: &quot;📦 Estimated LLM Tokens&quot;.to_string(),
-            value: token_usage,
+            key: &quot;📦 LLM Tokens&quot;.to_string(),
+            value: token_text,
         });
+        
+        // Add cache statistics if available
+        if let (Some(hits), Some(misses)) = (report.token_cache_hits, report.token_cache_misses) {
+            let total = hits + misses;
+            let hit_rate = if total &gt; 0 {
+                format!(&quot;{:.1}%&quot;, (hits as f64 / total as f64) * 100.0)
+            } else {
+                &quot;0.0%&quot;.to_string()
+            };
+            
+            rows.push(SummaryRow {
+                key: &quot;🔄 Cache Hit Rate&quot;.to_string(),
+                value: format!(&quot;{} ({} hits / {} total)&quot;, hit_rate, hits, total),
+            });
+        }
 
         // Create and style the table
         let mut table = Table::new(rows);
@@ -1889,12 +1648,18 @@ impl Reporter {
                 // Format and truncate path if needed
                 let display_path = self.format_path(path, 60);
 
-                let estimated_tokens = info.chars / 4;
+                // Use actual token count if available, otherwise estimate
+                let token_count = if let Some(tokens) = info.tokens {
+                    self.format_number(tokens)
+                } else {
+                    let estimated_tokens = info.chars / 4;
+                    self.format_number(estimated_tokens)
+                };
 
                 FileRow {
                     path: display_path,
                     lines: self.format_number(info.lines),
-                    tokens: self.format_number(estimated_tokens),
+                    tokens: token_count,
                 }
             })
             .collect();
@@ -1932,49 +1697,1175 @@ impl Reporter {
 }
 </content>
           </file>
+          <file name="tests.rs" path="dumpfs/src/tests.rs">
+            <metadata>
+              <size>10181</size>
+              <modified>2025-03-27T07:18:59.888763642+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Tests for DumpFS functionality
+ */
+
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::Path;
+use std::sync::Arc;
+
+use indicatif::ProgressBar;
+use quick_xml::events::Event;
+use quick_xml::Reader;
+use tempfile::tempdir;
+
+use crate::config::Config;
+use crate::scanner::Scanner;
+use crate::writer::XmlWriter;
+
+// Helper function to create a test directory structure
+fn setup_test_directory() -&gt; io::Result&lt;tempfile::TempDir&gt; {
+    let temp_dir = tempdir()?;
+
+    // Create a simple directory structure
+    fs::create_dir(temp_dir.path().join(&quot;dir1&quot;))?;
+    fs::create_dir(temp_dir.path().join(&quot;dir2&quot;))?;
+    fs::create_dir(temp_dir.path().join(&quot;dir1&quot;).join(&quot;subdir&quot;))?;
+
+    // Create text files
+    let mut file1 = File::create(temp_dir.path().join(&quot;file1.txt&quot;))?;
+    writeln!(file1, &quot;This is a text file with content&quot;)?;
+
+    let mut file2 = File::create(temp_dir.path().join(&quot;dir1&quot;).join(&quot;file2.txt&quot;))?;
+    writeln!(file2, &quot;This is another text file\nwith multiple lines&quot;)?;
+
+    let mut file3 = File::create(
+        temp_dir
+            .path()
+            .join(&quot;dir1&quot;)
+            .join(&quot;subdir&quot;)
+            .join(&quot;file3.txt&quot;),
+    )?;
+    writeln!(file3, &quot;Nested file content&quot;)?;
+
+    // Create files to be ignored
+    fs::create_dir(temp_dir.path().join(&quot;.git&quot;))?;
+    let mut git_file = File::create(temp_dir.path().join(&quot;.git&quot;).join(&quot;config&quot;))?;
+    writeln!(git_file, &quot;[core]\n\trepositoryformatversion = 0&quot;)?;
+
+    // Create a binary file
+    let mut bin_file = File::create(temp_dir.path().join(&quot;binary.bin&quot;))?;
+    bin_file.write_all(&amp;[0u8, 1u8, 2u8, 3u8])?;
+
+    // Create a symlink if not on Windows
+    #[cfg(not(target_os = &quot;windows&quot;))]
+    std::os::unix::fs::symlink(
+        temp_dir.path().join(&quot;file1.txt&quot;),
+        temp_dir.path().join(&quot;symlink.txt&quot;),
+    )?;
+
+    Ok(temp_dir)
+}
+
+// Helper function to create a test directory with a .gitignore file
+fn setup_gitignore_test_directory() -&gt; io::Result&lt;tempfile::TempDir&gt; {
+    let temp_dir = setup_test_directory()?;
+
+    // Create a .gitignore file
+    let mut gitignore = File::create(temp_dir.path().join(&quot;.gitignore&quot;))?;
+    writeln!(gitignore, &quot;# Ignore all .txt files&quot;)?;
+    writeln!(gitignore, &quot;*.txt&quot;)?;
+    writeln!(gitignore, &quot;# Ignore binary.bin&quot;)?;
+    writeln!(gitignore, &quot;binary.bin&quot;)?;
+
+    // Create some additional files that aren&apos;t explicitly ignored
+    let mut not_ignored = File::create(temp_dir.path().join(&quot;not_ignored.md&quot;))?;
+    writeln!(not_ignored, &quot;# This file shouldn&apos;t be ignored&quot;)?;
+
+    Ok(temp_dir)
+}
+
+// Helper function to create a large file (&gt;1MB)
+fn create_large_file(dir: &amp;Path) -&gt; io::Result&lt;()&gt; {
+    let path = dir.join(&quot;large_file.txt&quot;);
+    let mut file = File::create(path)?;
+
+    // Write over 1MB of data
+    let line = &quot;This is a line of text that will be repeated many times to create a large file.\n&quot;;
+    for _ in 0..20000 {
+        file.write_all(line.as_bytes())?;
+    }
+
+    Ok(())
+}
+
+// Test basic scanning functionality
+#[test]
+fn test_basic_scan() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![],
+        num_threads: 1,
+        respect_gitignore: false,
+        gitignore_path: None,
+        model: None,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Check that the output file exists
+    assert!(output_file.exists());
+
+    // Read the XML file to verify structure
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // Check basic structure
+    assert!(xml_content.contains(&quot;&lt;directory_scan&quot;));
+    assert!(xml_content.contains(&quot;&lt;system_info&gt;&quot;));
+    assert!(xml_content.contains(&quot;&lt;hostname&gt;&quot;));
+    assert!(xml_content.contains(&quot;&lt;directory name=&quot;));
+    assert!(xml_content.contains(&quot;&lt;file name=\&quot;file1.txt\&quot;&quot;));
+    assert!(xml_content.contains(&quot;This is a text file with content&quot;));
+
+    // The .git directory should be ignored by default
+    assert!(!xml_content.contains(&quot;.git&quot;));
+
+    Ok(())
+}
+
+// Test ignore patterns
+#[test]
+fn test_ignore_patterns() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![&quot;*.txt&quot;.to_string()],
+        include_patterns: vec![],
+        num_threads: 1,
+        respect_gitignore: false,
+        model: None,
+        gitignore_path: None,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Read the XML file
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // All .txt files should be ignored
+    assert!(!xml_content.contains(&quot;file1.txt&quot;));
+    assert!(!xml_content.contains(&quot;file2.txt&quot;));
+    assert!(!xml_content.contains(&quot;file3.txt&quot;));
+
+    // The binary file should still be included
+    assert!(xml_content.contains(&quot;binary.bin&quot;));
+
+    Ok(())
+}
+
+// Test include patterns
+#[test]
+fn test_include_patterns() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![&quot;*.bin&quot;.to_string()],
+        num_threads: 1,
+        respect_gitignore: false,
+        model: None,
+        gitignore_path: None,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Read the XML file
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // Only .bin files should be included
+    assert!(!xml_content.contains(&quot;file1.txt&quot;));
+    assert!(!xml_content.contains(&quot;file2.txt&quot;));
+    assert!(!xml_content.contains(&quot;file3.txt&quot;));
+    assert!(xml_content.contains(&quot;binary.bin&quot;));
+
+    Ok(())
+}
+
+// Test handling of large files
+#[test]
+fn test_large_file_handling() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    create_large_file(temp_dir.path())?;
+
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![],
+        num_threads: 1,
+        respect_gitignore: false,
+        model: None,
+        gitignore_path: None,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Read the XML file
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // Large file should be mentioned but content should be truncated
+    assert!(xml_content.contains(&quot;large_file.txt&quot;));
+    assert!(xml_content.contains(&quot;File too large to include content&quot;));
+
+    Ok(())
+}
+
+// Test XML structure validity
+#[test]
+fn test_xml_validity() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![],
+        num_threads: 1,
+        model: None,
+        respect_gitignore: false,
+        gitignore_path: None,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Parse the XML file to verify it&apos;s well-formed
+    let file_content = fs::read_to_string(&amp;output_file)?;
+    let mut reader = Reader::from_str(&amp;file_content);
+
+    let mut depth = 0;
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&amp;mut buf) {
+            Ok(Event::Start(_)) =&gt; depth += 1,
+            Ok(Event::End(_)) =&gt; depth -= 1,
+            Ok(Event::Eof) =&gt; break,
+            Err(e) =&gt; panic!(&quot;Error parsing XML: {}&quot;, e),
+            _ =&gt; (),
+        }
+        buf.clear();
+    }
+
+    // If XML is well-formed, depth should be 0 at the end
+    assert_eq!(depth, 0, &quot;XML structure is not well-balanced&quot;);
+
+    Ok(())
+}
+
+// Test respecting .gitignore files
+#[test]
+fn test_respect_gitignore() -&gt; io::Result&lt;()&gt; {
+    let temp_dir = setup_gitignore_test_directory()?;
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    let config = Config {
+        target_dir: temp_dir.path().to_path_buf(),
+        output_file: output_file.clone(),
+        ignore_patterns: vec![],
+        include_patterns: vec![],
+        num_threads: 1,
+        respect_gitignore: true,
+        model: None,
+        gitignore_path: None,
+    };
+
+    let progress = Arc::new(ProgressBar::hidden());
+    let scanner = Scanner::new(config.clone(), Arc::clone(&amp;progress));
+    let writer = XmlWriter::new(config);
+
+    let root_node = scanner.scan()?;
+    writer.write(&amp;root_node)?;
+
+    // Read the XML file
+    let xml_content = fs::read_to_string(&amp;output_file)?;
+
+    // Files excluded by .gitignore should not be present
+    assert!(!xml_content.contains(&quot;file1.txt&quot;));
+    assert!(!xml_content.contains(&quot;file2.txt&quot;));
+    assert!(!xml_content.contains(&quot;file3.txt&quot;));
+    assert!(!xml_content.contains(&quot;binary.bin&quot;));
+
+    // Files not excluded by .gitignore should be present
+    assert!(xml_content.contains(&quot;not_ignored.md&quot;));
+
+    Ok(())
+}
+</content>
+          </file>
+          <file name="tokenizer.rs" path="dumpfs/src/tokenizer.rs">
+            <metadata>
+              <size>25561</size>
+              <modified>2025-03-27T07:55:55.273073604+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Tokenizer module for token counting with different LLM models
+ *
+ * Includes caching of already tokenized content to improve performance
+ * when the same content is processed multiple times.
+ */
+
+use std::collections::hash_map::DefaultHasher;
+use std::error::Error;
+use std::fmt::{Display, Formatter};
+use std::fs;
+use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+
+use clap::ValueEnum;
+use reqwest;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use strum::{Display, EnumIter, EnumProperty, EnumString};
+
+/// Supported LLM models for tokenization
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    EnumIter,
+    Display,
+    ValueEnum,
+    Serialize,
+    Deserialize,
+    EnumProperty,
+)]
+pub enum Model {
+    #[strum(props(
+        model_id = &quot;claude-3-5-sonnet-latest&quot;,
+        context_window = 200000,
+        provider = &quot;anthropic&quot;
+    ))]
+    Sonnet35,
+
+    #[strum(props(
+        model_id = &quot;claude-3-7-sonnet-latest&quot;,
+        context_window = 200000,
+        provider = &quot;anthropic&quot;
+    ))]
+    Sonnet37,
+
+    // OpenAI models
+    #[strum(props(model_id = &quot;gpt-4&quot;, context_window = 8192, provider = &quot;openai&quot;))]
+    Gpt4,
+
+    #[strum(props(
+        model_id = &quot;gpt-4-0125-preview&quot;,
+        context_window = 128000,
+        provider = &quot;openai&quot;
+    ))]
+    Gpt4Turbo,
+
+    #[strum(props(model_id = &quot;gpt-4o&quot;, context_window = 8192, provider = &quot;openai&quot;))]
+    Gpt4o,
+
+    // HuggingFace models
+    #[strum(props(
+        model_id = &quot;meta-llama/Llama-2-7b-hf&quot;,
+        context_window = 4096,
+        provider = &quot;huggingface&quot;
+    ))]
+    Llama2_7b,
+
+    #[strum(props(
+        model_id = &quot;meta-llama/Llama-3-8b-hf&quot;,
+        context_window = 8192,
+        provider = &quot;huggingface&quot;
+    ))]
+    Llama3_8b,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Small-3.1-24B-Base-2503&quot;,
+        context_window = 128000,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralSmall24B,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Large-Instruct-2411&quot;,
+        context_window = 128000,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralLargeInstruct,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Pixtral-12B-Base-2409&quot;,
+        context_window = 128000,
+        provider = &quot;huggingface&quot;
+    ))]
+    Pixtral12B,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Small-Instruct-2409&quot;,
+        context_window = 32000,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralSmall,
+}
+
+impl Model {
+    /// Get the context window size for this model
+    pub fn context_window(&amp;self) -&gt; usize {
+        self.get_int(&quot;context_window&quot;).unwrap() as usize
+    }
+
+    /// Get the provider of this model
+    pub fn provider(&amp;self) -&gt; ModelProvider {
+        let provider = self.get_str(&quot;provider&quot;).unwrap();
+        ModelProvider::from_str(provider).unwrap()
+    }
+
+    /// Get the model identifier as used by the provider&apos;s API
+    pub fn model_id(&amp;self) -&gt; &amp;&apos;static str {
+        self.get_str(&quot;model_id&quot;).unwrap()
+    }
+}
+
+/// Model providers
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, Display)]
+#[strum(serialize_all = &quot;lowercase&quot;)]
+pub enum ModelProvider {
+    /// Anthropic (Claude models)
+    Anthropic,
+    /// OpenAI (GPT models)
+    OpenAI,
+    /// HuggingFace models
+    HuggingFace,
+}
+
+/// Get the path to the token cache file for a specific project directory
+pub fn get_cache_path(project_dir: &amp;str) -&gt; Result&lt;PathBuf, TokenizerError&gt; {
+    // Get home directory
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        TokenizerError::ApiError(&quot;Could not determine home directory&quot;.to_string())
+    })?;
+
+    // Create ~/.cache/dumpfs directory if it doesn&apos;t exist
+    let cache_dir = home_dir.join(&quot;.cache&quot;).join(&quot;dumpfs&quot;);
+    fs::create_dir_all(&amp;cache_dir).map_err(|e| {
+        TokenizerError::ApiError(format!(&quot;Failed to create cache directory: {}&quot;, e))
+    })?;
+
+    // Create a sanitized filename based on the project directory path
+    let canonical_path = fs::canonicalize(project_dir)
+        .map_err(|e| TokenizerError::ApiError(format!(&quot;Invalid project directory: {}&quot;, e)))?;
+
+    // Convert the path to a string, removing any invalid characters
+    let path_str = canonical_path.to_string_lossy().to_string();
+    let sanitized_path = path_str.replace(
+        |c: char| !c.is_alphanumeric() &amp;&amp; c != &apos;_&apos; &amp;&amp; c != &apos;-&apos; &amp;&amp; c != &apos;.&apos;,
+        &quot;_&quot;,
+    );
+
+    // Create the cache file path
+    let cache_file = cache_dir.join(format!(&quot;{}.token_cache.json&quot;, sanitized_path));
+
+    Ok(cache_file)
+}
+
+/// Cache entry with token count and model identifier
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TokenCacheEntry {
+    /// Hash of the content
+    hash: u64,
+    /// Model used for tokenization
+    model: String,
+    /// Token count
+    tokens: usize,
+    /// Timestamp when the entry was created
+    timestamp: u64,
+}
+
+/// Cache for token counts to avoid redundant processing
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct TokenCache {
+    /// Cached token entries
+    entries: Vec&lt;TokenCacheEntry&gt;,
+    /// Number of cache hits
+    #[serde(skip)]
+    pub hits: usize,
+    /// Number of cache misses
+    #[serde(skip)]
+    pub misses: usize,
+}
+
+impl TokenCache {
+    /// Create a new empty token cache
+    pub fn new(project_dir: &amp;str) -&gt; Self {
+        // Try to load cache from disk, otherwise create new
+        Self::load(project_dir).unwrap_or_else(|_| Self {
+            entries: Vec::new(),
+            hits: 0,
+            misses: 0,
+        })
+    }
+
+    /// Calculate hash for content
+    fn hash_content(&amp;self, content: &amp;str) -&gt; u64 {
+        let mut hasher = DefaultHasher::new();
+        content.hash(&amp;mut hasher);
+        hasher.finish()
+    }
+
+    /// Get token count from cache if available
+    pub fn get(&amp;mut self, content: &amp;str, model_id: &amp;str) -&gt; Option&lt;usize&gt; {
+        let hash = self.hash_content(content);
+
+        // Find matching entry by hash and model
+        let result = self
+            .entries
+            .iter()
+            .find(|entry| entry.hash == hash &amp;&amp; entry.model == model_id)
+            .map(|entry| entry.tokens);
+
+        if result.is_some() {
+            self.hits += 1;
+            CACHE_HITS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        } else {
+            self.misses += 1;
+            CACHE_MISSES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        result
+    }
+
+    /// Insert token count into cache
+    pub fn insert(&amp;mut self, content: &amp;str, model_id: &amp;str, count: usize, project_dir: &amp;str) {
+        let hash = self.hash_content(content);
+
+        // Remove existing entry with same hash and model if present
+        self.entries
+            .retain(|entry| !(entry.hash == hash &amp;&amp; entry.model == model_id));
+
+        // Add new entry
+        self.entries.push(TokenCacheEntry {
+            hash,
+            model: model_id.to_string(),
+            tokens: count,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        });
+
+        // Save cache to disk
+        if let Err(e) = self.save(project_dir) {
+            eprintln!(&quot;Failed to save token cache: {}&quot;, e);
+        }
+    }
+
+    /// Get cache statistics
+    pub fn get_stats(&amp;self) -&gt; (usize, usize) {
+        (self.hits, self.misses)
+    }
+
+    /// Load cache from disk
+    pub fn load(project_dir: &amp;str) -&gt; Result&lt;Self, TokenizerError&gt; {
+        let path = get_cache_path(project_dir)?;
+
+        if !path.exists() {
+            return Err(TokenizerError::ApiError(&quot;Cache file not found&quot;.to_string()));
+        }
+
+        let content = std::fs::read_to_string(&amp;path)
+            .map_err(|e| TokenizerError::ApiError(format!(&quot;Failed to read cache file: {}&quot;, e)))?;
+
+        serde_json::from_str(&amp;content)
+            .map_err(|e| TokenizerError::ApiError(format!(&quot;Failed to parse cache file: {}&quot;, e)))
+    }
+
+    /// Save cache to disk
+    pub fn save(&amp;self, project_dir: &amp;str) -&gt; Result&lt;(), TokenizerError&gt; {
+        let content = serde_json::to_string(self)
+            .map_err(|e| TokenizerError::ApiError(format!(&quot;Failed to serialize cache: {}&quot;, e)))?;
+
+        let path = get_cache_path(project_dir)?;
+        std::fs::write(&amp;path, content)
+            .map_err(|e| TokenizerError::ApiError(format!(&quot;Failed to write cache file: {}&quot;, e)))?;
+
+        Ok(())
+    }
+}
+
+/// TokenCount represents the result of token counting
+#[derive(Debug, Clone, Copy)]
+pub struct TokenCount {
+    /// Number of tokens in the text
+    pub tokens: usize,
+    /// Whether this was a cache hit (if caching is enabled)
+    pub cached: Option&lt;bool&gt;,
+}
+
+/// TokenizerError represents errors from tokenizer operations
+#[derive(Debug)]
+pub enum TokenizerError {
+    /// Error calling API
+    ApiError(String),
+
+    /// Error with the tokenizer library
+    TokenizerError(String),
+
+    /// Model is not supported
+    UnsupportedModel(String),
+
+    /// Environment variable not set
+    EnvVarError(String),
+}
+
+impl Display for TokenizerError {
+    fn fmt(&amp;self, f: &amp;mut Formatter&lt;&apos;_&gt;) -&gt; std::fmt::Result {
+        match self {
+            TokenizerError::ApiError(msg) =&gt; write!(f, &quot;API error: {}&quot;, msg),
+            TokenizerError::TokenizerError(msg) =&gt; write!(f, &quot;Tokenizer error: {}&quot;, msg),
+            TokenizerError::UnsupportedModel(msg) =&gt; write!(f, &quot;Unsupported model: {}&quot;, msg),
+            TokenizerError::EnvVarError(msg) =&gt; write!(f, &quot;Environment variable error: {}&quot;, msg),
+        }
+    }
+}
+
+impl Error for TokenizerError {}
+
+impl From&lt;std::io::Error&gt; for TokenizerError {
+    fn from(error: std::io::Error) -&gt; Self {
+        TokenizerError::ApiError(format!(&quot;IO error: {}&quot;, error))
+    }
+}
+
+impl From&lt;serde_json::Error&gt; for TokenizerError {
+    fn from(error: serde_json::Error) -&gt; Self {
+        TokenizerError::ApiError(format!(&quot;JSON error: {}&quot;, error))
+    }
+}
+
+/// Tokenizer trait defines the interface for all tokenizers
+pub trait Tokenizer: Send + Sync {
+    /// Count tokens in the given text
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; Result&lt;TokenCount, TokenizerError&gt;;
+
+    /// Get the context window size for this model
+    fn model_context_window(&amp;self) -&gt; usize;
+}
+
+/// Cached tokenizer that wraps another tokenizer and caches results
+pub struct CachedTokenizer {
+    /// Inner tokenizer that does the actual tokenization
+    inner: Box&lt;dyn Tokenizer&gt;,
+    /// Cache for token counts
+    cache: Arc&lt;Mutex&lt;TokenCache&gt;&gt;,
+    /// Model used for tokenization
+    model: Model,
+    /// Project directory for cache storage
+    project_dir: String,
+}
+
+// Global cache statistics for easier access
+static CACHE_HITS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static CACHE_MISSES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+impl CachedTokenizer {
+    /// Create a new cached tokenizer wrapping another tokenizer
+    pub fn new(inner: Box&lt;dyn Tokenizer&gt;, model: Model, project_dir: &amp;str) -&gt; Self {
+        // Clean up and optimize cache on creation
+        Self::clean_old_cache_entries(project_dir).ok();
+
+        Self {
+            inner,
+            cache: Arc::new(Mutex::new(TokenCache::new(project_dir))),
+            model,
+            project_dir: project_dir.to_string(),
+        }
+    }
+
+    /// Clean old cache entries (older than 7 days)
+    fn clean_old_cache_entries(project_dir: &amp;str) -&gt; Result&lt;(), TokenizerError&gt; {
+        let path = get_cache_path(project_dir)?;
+        if !path.exists() {
+            return Ok(());
+        }
+
+        let content = std::fs::read_to_string(&amp;path)?;
+        let mut cache: TokenCache = serde_json::from_str(&amp;content)?;
+
+        // Current timestamp
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // 7 days in seconds
+        const WEEK_IN_SECS: u64 = 7 * 24 * 60 * 60;
+
+        // Remove entries older than a week
+        let old_len = cache.entries.len();
+        cache
+            .entries
+            .retain(|entry| now - entry.timestamp &lt; WEEK_IN_SECS);
+
+        // If we removed any entries, save the file
+        if cache.entries.len() &lt; old_len {
+            cache.save(project_dir)?;
+        }
+
+        Ok(())
+    }
+
+    /// Get cache statistics (hits, misses)
+    pub fn get_cache_stats(&amp;self) -&gt; (usize, usize) {
+        if let Ok(cache) = self.cache.lock() {
+            cache.get_stats()
+        } else {
+            (0, 0) // Return zeros if mutex is poisoned
+        }
+    }
+
+    /// Get global cache statistics
+    pub fn get_global_cache_stats() -&gt; (usize, usize) {
+        let hits = CACHE_HITS.load(std::sync::atomic::Ordering::Relaxed);
+        let misses = CACHE_MISSES.load(std::sync::atomic::Ordering::Relaxed);
+        (hits, misses)
+    }
+}
+
+impl Tokenizer for CachedTokenizer {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; Result&lt;TokenCount, TokenizerError&gt; {
+        let model_id = self.model.model_id();
+
+        // Try to get from cache first
+        let cached = if let Ok(mut cache) = self.cache.lock() {
+            cache.get(text, model_id)
+        } else {
+            None
+        };
+
+        // If found in cache, return it
+        if let Some(count) = cached {
+            return Ok(TokenCount {
+                tokens: count,
+                cached: Some(true),
+            });
+        }
+
+        // Otherwise, delegate to inner tokenizer
+        let result = self.inner.count_tokens(text)?;
+
+        // Update cache with the result
+        if let Ok(mut cache) = self.cache.lock() {
+            cache.insert(text, model_id, result.tokens, &amp;self.project_dir);
+        }
+
+        // Return result with cache flag
+        Ok(TokenCount {
+            tokens: result.tokens,
+            cached: Some(false),
+        })
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.inner.model_context_window()
+    }
+}
+
+/// Create a tokenizer for the specified model
+pub fn create_tokenizer(
+    model: Model,
+    project_dir: &amp;str,
+) -&gt; Result&lt;Box&lt;dyn Tokenizer&gt;, TokenizerError&gt; {
+    let inner: Box&lt;dyn Tokenizer&gt; = match model.provider() {
+        ModelProvider::Anthropic =&gt; Box::new(ClaudeTokenizer::new(model)),
+        ModelProvider::OpenAI =&gt; Box::new(OpenAITokenizer::new(model)?),
+        ModelProvider::HuggingFace =&gt; Box::new(HuggingFaceTokenizer::new(model)),
+    };
+
+    // Wrap with cached tokenizer
+    Ok(Box::new(CachedTokenizer::new(inner, model, project_dir)))
+}
+
+/// Claude tokenizer implementation
+pub struct ClaudeTokenizer {
+    model: Model,
+}
+
+impl ClaudeTokenizer {
+    pub fn new(model: Model) -&gt; Self {
+        Self { model }
+    }
+}
+
+impl Tokenizer for ClaudeTokenizer {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; Result&lt;TokenCount, TokenizerError&gt; {
+        // Check if API key is set
+        let api_key = std::env::var(&quot;ANTHROPIC_API_KEY&quot;).map_err(|_| {
+            TokenizerError::EnvVarError(
+                &quot;ANTHROPIC_API_KEY environment variable not set&quot;.to_string(),
+            )
+        })?;
+
+        // Create client and send request to token counting endpoint
+        let client = reqwest::blocking::Client::new();
+        let response = client
+            .post(&quot;https://api.anthropic.com/v1/messages/count_tokens&quot;)
+            .header(&quot;x-api-key&quot;, api_key)
+            .header(&quot;content-type&quot;, &quot;application/json&quot;)
+            .header(&quot;anthropic-version&quot;, &quot;2023-06-01&quot;)
+            .json(&amp;serde_json::json!({
+                &quot;model&quot;: self.model.model_id(),
+                &quot;messages&quot;: [{
+                    &quot;role&quot;: &quot;user&quot;,
+                    &quot;content&quot;: text
+                }]
+            }))
+            .send()
+            .map_err(|e| TokenizerError::ApiError(format!(&quot;Failed to send request: {}&quot;, e)))?;
+
+        // Check response status
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| &quot;Unable to read error message&quot;.to_string());
+            return Err(TokenizerError::ApiError(format!(
+                &quot;Claude API returned error status {}: {}&quot;,
+                status, error_text
+            )));
+        }
+
+        // Parse the response
+        #[derive(Deserialize)]
+        struct TokenResponse {
+            input_tokens: usize,
+        }
+
+        let token_response: TokenResponse = response
+            .json()
+            .map_err(|e| TokenizerError::ApiError(format!(&quot;Failed to parse response: {}&quot;, e)))?;
+
+        Ok(TokenCount {
+            tokens: token_response.input_tokens,
+            cached: None,
+        })
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.model.context_window()
+    }
+}
+
+/// OpenAITokenizer encapsulates tiktoken-based tokenization for OpenAI models
+pub struct OpenAITokenizer {
+    model: Model,
+    encoding: tiktoken_rs::CoreBPE,
+}
+
+impl OpenAITokenizer {
+    pub fn new(model: Model) -&gt; Result&lt;Self, TokenizerError&gt; {
+        let encoding = tiktoken_rs::get_bpe_from_model(model.model_id())
+            .map_err(|e| TokenizerError::TokenizerError(e.to_string()))?;
+
+        Ok(Self { model, encoding })
+    }
+}
+
+impl Tokenizer for OpenAITokenizer {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; Result&lt;TokenCount, TokenizerError&gt; {
+        let tokens = self.encoding.encode_ordinary(text);
+        Ok(TokenCount {
+            tokens: tokens.len(),
+            cached: None,
+        })
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.model.context_window()
+    }
+}
+
+/// HuggingFace tokenizer implementation using the tokenizers crate
+pub struct HuggingFaceTokenizer {
+    model: Model,
+    repo_id: &amp;&apos;static str,
+    tokenizer: Option&lt;tokenizers::Tokenizer&gt;,
+}
+
+impl HuggingFaceTokenizer {
+    pub fn new(model: Model) -&gt; Self {
+        let repo_id = model.model_id();
+
+        // Don&apos;t initialize tokenizer here - lazy load on first use
+        Self {
+            model,
+            repo_id,
+            tokenizer: None,
+        }
+    }
+
+    /// Lazily initialize the tokenizer on first use
+    fn get_or_initialize_tokenizer(&amp;mut self) -&gt; Result&lt;&amp;tokenizers::Tokenizer, TokenizerError&gt; {
+        if self.tokenizer.is_none() {
+            // Load tokenizer from HuggingFace Hub
+            let tokenizer = match tokenizers::Tokenizer::from_pretrained(self.repo_id, None) {
+                Ok(t) =&gt; t,
+                Err(e) =&gt; {
+                    eprintln!(&quot;{e}&quot;);
+                    let mut tokenizer =
+                        tokenizers::Tokenizer::new(tokenizers::models::bpe::BPE::default());
+
+                    // Configure for LLaMA-like tokenization
+                    tokenizer.with_pre_tokenizer(Some(
+                        tokenizers::pre_tokenizers::whitespace::Whitespace,
+                    ));
+
+                    tokenizer
+                }
+            };
+
+            self.tokenizer = Some(tokenizer);
+        }
+
+        Ok(self.tokenizer.as_ref().unwrap())
+    }
+}
+
+impl Tokenizer for HuggingFaceTokenizer {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; Result&lt;TokenCount, TokenizerError&gt; {
+        // We need to make self mutable for lazy initialization
+        let mut mutable_self = Self {
+            model: self.model,
+            repo_id: self.repo_id,
+            tokenizer: self.tokenizer.clone(),
+        };
+
+        // Get or initialize the tokenizer
+        let tokenizer = mutable_self.get_or_initialize_tokenizer()?;
+
+        // Encode the text
+        let encoding = tokenizer
+            .encode(text, false)
+            .map_err(|e| TokenizerError::TokenizerError(format!(&quot;Failed to encode text: {}&quot;, e)))?;
+
+        // Get the token count
+        let tokens = encoding.get_ids().len();
+
+        eprintln!(&quot;HuggingFace tokenizer using model: {}&quot;, self.repo_id);
+        eprintln!(&quot;Token count for text of length {}: {}&quot;, text.len(), tokens);
+
+        Ok(TokenCount {
+            tokens,
+            cached: None,
+        })
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.model.context_window()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    // OpenAI Tests
+    mod openai_tests {
+        use super::*;
+
+        #[test]
+        fn test_openai_tokenizer_basic() {
+            let tokenizer = OpenAITokenizer::new(Model::Gpt4).expect(&quot;Intialize openai tokenizer&quot;);
+            let result = tokenizer.count_tokens(&quot;Hello, world!&quot;);
+            assert!(result.is_ok());
+
+            let tokens = result.unwrap().tokens;
+            assert!(tokens &gt; 0);
+        }
+
+        #[test]
+        fn test_openai_tokenizer_code_content() {
+            let tokenizer = OpenAITokenizer::new(Model::Gpt4o).expect(&quot;Intialize openai tokenizer&quot;);
+            let code = r#&quot;
+                fn main() {
+                    println!(&quot;Hello, world!&quot;);
+                    let x = 42;
+                    let y = x * 2;
+                    println!(&quot;x: {}, y: {}&quot;, x, y);
+                }
+            &quot;#;
+
+            let result = tokenizer.count_tokens(code);
+            assert!(result.is_ok());
+
+            let tokens = result.unwrap().tokens;
+            // Code should be tokenized differently than plain text
+            assert!(tokens &gt; code.len() / 10); // Very rough estimate
+        }
+
+        #[test]
+        fn test_openai_tokenizer_special_tokens() {
+            let tokenizer =
+                OpenAITokenizer::new(Model::Gpt4Turbo).expect(&quot;Intialize openai tokenizer&quot;);
+            // Test with various special tokens and character sets
+            let special_text = &quot;Hello\n\nworld! &lt;|endoftext|&gt; User: Assistant: $$$&quot;;
+
+            let result = tokenizer.count_tokens(special_text);
+            assert!(result.is_ok());
+
+            let tokens = result.unwrap().tokens;
+            // Special tokens should be counted separately
+            assert!(tokens &gt;= 10); // Rough minimum based on content
+        }
+    }
+
+    // HuggingFace Tests
+    mod huggingface_tests {
+        use super::*;
+
+        #[test]
+        fn test_huggingface_tokenizer_basic() {
+            let tokenizer = HuggingFaceTokenizer::new(Model::Llama2_7b);
+            let result = tokenizer.count_tokens(&quot;Hello, world!&quot;);
+            assert!(result.is_ok());
+
+            let tokens = result.unwrap().tokens;
+            assert!(tokens &gt; 0);
+        }
+
+        #[test]
+        fn test_huggingface_tokenizer_long_text() {
+            let tokenizer = HuggingFaceTokenizer::new(Model::Llama3_8b);
+            let long_text = &quot;This is a much longer text that should be tokenized into many tokens. It includes various sentences with different structures and vocabulary to test the tokenizer&apos;s behavior with more complex content. The goal is to ensure that the tokenizer can handle real-world text correctly.&quot;;
+
+            let result = tokenizer.count_tokens(long_text);
+            assert!(result.is_ok());
+
+            let tokens = result.unwrap().tokens;
+            assert!(tokens &gt;= long_text.split_whitespace().count());
+        }
+
+        #[test]
+        fn test_huggingface_tokenizer_fallback() {
+            // Test the fallback mechanism when model loading fails
+            let tokenizer = HuggingFaceTokenizer::new(Model::MistralSmall);
+
+            // Use intentionally difficult text
+            let text = &quot;🤗 This includes emoji and unusual characters: →☺←&quot;;
+
+            let result = tokenizer.count_tokens(text);
+            // The result should be Ok even if the model couldn&apos;t be loaded
+            assert!(result.is_ok());
+        }
+    }
+
+    // Claude Tests (only run when API key is available)
+    mod claude_tests {
+        use super::*;
+
+        #[test]
+        #[ignore] // Skip this test by default since it requires an API key
+        fn test_claude_tokenizer() {
+            // Only run this test if ANTHROPIC_API_KEY is set
+            match env::var(&quot;ANTHROPIC_API_KEY&quot;) {
+                Ok(api_key) if !api_key.is_empty() =&gt; {
+                    let tokenizer = ClaudeTokenizer::new(Model::Sonnet37);
+                    let result = tokenizer.count_tokens(&quot;Hello, Claude! How are you today?&quot;);
+
+                    assert!(result.is_ok());
+                    let tokens = result.unwrap().tokens;
+                    assert!(tokens &gt; 0);
+
+                    // When API key is available, test different content types
+                    let code_result = tokenizer
+                        .count_tokens(&quot;def hello():\n    print(&apos;Hello, world!&apos;)\n\nhello()&quot;);
+                    assert!(code_result.is_ok());
+                }
+                _ =&gt; {
+                    // Skip test when API key is not available
+                    println!(&quot;Skipping Claude tokenizer test (no API key)&quot;);
+                }
+            }
+        }
+
+        #[test]
+        fn test_claude_tokenizer_error_handling() {
+            // Test error handling when API key is not set
+            // Temporarily unset the API key if it exists
+            let api_key = env::var(&quot;ANTHROPIC_API_KEY&quot;).ok();
+            env::remove_var(&quot;ANTHROPIC_API_KEY&quot;);
+
+            let tokenizer = ClaudeTokenizer::new(Model::Sonnet35);
+            let result = tokenizer.count_tokens(&quot;Hello, Claude!&quot;);
+
+            // Should return an EnvVarError
+            assert!(result.is_err());
+            match result {
+                Err(TokenizerError::EnvVarError(_)) =&gt; (), // Expected error
+                _ =&gt; panic!(&quot;Expected EnvVarError when API key is not set&quot;),
+            }
+
+            // Restore API key if it was set
+            if let Some(key) = api_key {
+                env::set_var(&quot;ANTHROPIC_API_KEY&quot;, key);
+            }
+        }
+    }
+}
+</content>
+          </file>
         </contents>
       </directory>
-      <file name="Cargo.toml" path="dumpfs/Cargo.toml">
-        <metadata>
-          <size>543</size>
-          <modified>2025-03-26T23:54:02.133074349+03:00</modified>
-          <permissions>644</permissions>
-        </metadata>
-        <content>[package]
-name = &quot;dumpfs&quot;
-version = &quot;0.1.0&quot;
-edition = &quot;2021&quot;
-description = &quot;Generate XML representation of directory contents for LLM context&quot;
-authors = [&quot;DumpFS Team&quot;]
-license = &quot;MIT&quot;
-
-[dependencies]
-clap = { version = &quot;4.3&quot;, features = [&quot;derive&quot;] }
-walkdir = &quot;2.3&quot;
-quick-xml = &quot;0.37.3&quot;
-rayon = &quot;1.7&quot;
-indicatif = &quot;0.17&quot;
-glob-match = &quot;0.2&quot;
-chrono = &quot;0.4&quot;
-once_cell = &quot;1.18&quot;
-hostname = &quot;0.4.0&quot;
-ignore = &quot;0.4.21&quot;
-tabled = &quot;0.18.0&quot;
-
-[dev-dependencies]
-tempfile = &quot;3.8&quot;
-
-[profile.release]
-lto = true
-codegen-units = 1
-panic = &quot;abort&quot;
-strip = true
-</content>
-      </file>
       <file name="README.md" path="dumpfs/README.md">
         <metadata>
-          <size>6667</size>
-          <modified>2025-03-27T00:24:20.430935307+03:00</modified>
+          <size>8763</size>
+          <modified>2025-03-27T07:53:55.088917414+03:00</modified>
           <permissions>644</permissions>
         </metadata>
         <content># DumpFS: Directory Context Generator for LLMs
@@ -1993,6 +2884,7 @@ strip = true
 - Progress tracking with ETA and detailed file statistics
 - Beautiful Unicode progress display with real-time file information
 - Comprehensive summary of scanned content with LLM token estimation
+- Intelligent caching of tokenized files for faster processing
 
 ## Installation
 
@@ -2017,7 +2909,31 @@ OPTIONS:
     --threads &lt;N&gt;                                Number of threads to use for processing
     --respect-gitignore &lt;BOOL&gt;                   Whether to respect .gitignore files (default: true)
     --gitignore-path &lt;PATH&gt;                      Path to custom .gitignore file
+    --model &lt;MODEL&gt;                              LLM model to use for tokenization
 ```
+
+### Supported Models
+
+The `--model` option enables accurate token counting and caching. Supported models include:
+
+**OpenAI Models:**
+- `gpt-4` - GPT-4 (8K context window)
+- `gpt-4-turbo` - GPT-4 Turbo (128K context window)
+- `gpt4o` - GPT-4o (8K context window)
+
+**Anthropic Models:**
+- `sonnet-3.5` - Claude 3.5 Sonnet (200K context window)
+- `sonnet-3.7` - Claude 3.7 Sonnet (200K context window)
+
+**HuggingFace Models:**
+- `llama-2-7b` - Llama 2 7B (4K context window)
+- `llama-3-8b` - Llama 3 8B (8K context window)
+- `mistral-small` - Mistral Small (32K context window)
+- `mistral-small-24b` - Mistral Small 24B (128K context window)
+- `mistral-large` - Mistral Large (128K context window)
+- `pixtral-12b` - Pixtral 12B (128K context window)
+
+When a model is specified, `dumpfs` provides exact token counts instead of estimates and caches results for faster processing on subsequent runs.
 
 When running the command, you&apos;ll see a beautiful progress display showing:
 
@@ -2052,6 +2968,9 @@ dumpfs --respect-gitignore false
 
 # Use custom gitignore file
 dumpfs --gitignore-path /path/to/custom/gitignore
+
+# Use specific model for token counting with caching
+dumpfs --model gpt4o
 ```
 
 ## GitIgnore Support
@@ -2097,17 +3016,7 @@ The tool generates an XML file with the following structure:
 
 ## Example Output
 
-When running `dumpfs`, you&apos;ll initially see scanning messages and a progress bar:
-
-```
-📂 Scanning directory: .
-🔍 Respecting .gitignore files in the project
-🔎 Found 12 files to process
-```
-
-During processing, you&apos;ll see a beautiful progress display showing which files are being processed in real-time with an animated progress bar.
-
-After completion, the progress information is automatically cleared, and you&apos;ll see a comprehensive summary with the processed files followed by extraction statistics:
+When running `dumpfs`, you&apos;ll initially see scanning messages and a progress bar. After completion, the progress information is automatically cleared, and you&apos;ll see a comprehensive summary with the processed files followed by extraction statistics:
 
 ```
 📋  PROCESSED FILES
@@ -2128,31 +3037,102 @@ After completion, the progress information is automatically cleared, and you&apo
 ╰────────────────┴───────┴─────────────╯
 
 ✅  EXTRACTION COMPLETE
-╭─────────────────────────┬─────────────────────╮
-│ Metric                  │ Value               │
-├─────────────────────────┼─────────────────────┤
-│ 📂 Output File          │ .dumpfs.context.xml │
-│ ⏱️ Process Time         │ 7.647ms             │
-│ 📄 Files Processed      │ 12                  │
-│ 📝 Total Lines          │ 2.1K                │
-│ 📦 Estimated LLM Tokens │ 16.7K tokens        │
-╰─────────────────────────┴─────────────────────╯
+╭────────────────────┬─────────────────────────────╮
+│ Metric             │ Value                       │
+├────────────────────┼─────────────────────────────┤
+│ 📂 Output File     │ .dumpfs.context.xml         │
+│ ⏱️ Process Time    │ 10.8125ms                   │
+│ 📄 Files Processed │ 12                          │
+│ 📝 Total Lines     │ 3.0K                        │
+│ 📦 LLM Tokens      │ 21.2K tokens (counted)      │
+│ 🔄 Cache Hit Rate  │ 100.0% (12 hits / 12 total) │
+╰────────────────────┴─────────────────────────────╯
 ```
 
 The output provides:
-- A detailed breakdown of each file with line counts and token estimates
+- A detailed breakdown of each file with line counts and token counts
 - File paths displayed relative to the project root
 - Human-readable numbers with K suffixes for large values
 - Total processing time with millisecond precision
 - Total number of files processed
 - Total line count
-- Estimated token usage for LLM context
+- Exact token usage for LLM context (when using a model)
+- Cache hit rate showing tokenization efficiency
 
 This information is particularly valuable when preparing context for LLMs, as it helps you understand the size and composition of the context you&apos;re providing.
+
+## Token Caching
+
+When using the `--model` option, dumpfs implements intelligent caching of tokenized content:
+
+- Only tokenizes files that haven&apos;t been processed before or have changed
+- Persists cache between runs in `~/.cache/dumpfs/[project_path].token_cache.json`
+- Automatically cleans up old cache entries (older than 7 days)
+- Reports cache hit rate in the output summary
+
+This caching mechanism significantly improves performance when running the tool multiple times on the same codebase, especially with API-based tokenizers like those from OpenAI or Anthropic.
+
+**First run with caching:**
+```
+📦 LLM Tokens      │ 21.2K tokens (counted)      │
+🔄 Cache Hit Rate  │ 0.0% (0 hits / 12 total)    │
+```
+
+**Subsequent runs:**
+```
+📦 LLM Tokens      │ 21.2K tokens (counted)      │
+🔄 Cache Hit Rate  │ 100.0% (12 hits / 12 total) │
+```
+
+Tokenization is often the most time-consuming part of the process, especially when using remote API-based tokenizers, so this caching mechanism can dramatically improve performance for repeated scans.
 
 ## License
 
 MIT
+</content>
+      </file>
+      <file name="Cargo.toml" path="dumpfs/Cargo.toml">
+        <metadata>
+          <size>825</size>
+          <modified>2025-03-27T07:52:04.921654101+03:00</modified>
+          <permissions>644</permissions>
+        </metadata>
+        <content>[package]
+name = &quot;dumpfs&quot;
+version = &quot;0.1.0&quot;
+edition = &quot;2021&quot;
+description = &quot;Generate XML representation of directory contents for LLM context&quot;
+authors = [&quot;kkharji&quot;]
+license = &quot;MIT&quot;
+
+[dependencies]
+clap = { version = &quot;4.3&quot;, features = [&quot;derive&quot;] }
+walkdir = &quot;2.3&quot;
+quick-xml = &quot;0.37.3&quot;
+rayon = &quot;1.7&quot;
+indicatif = &quot;0.17&quot;
+glob-match = &quot;0.2&quot;
+chrono = &quot;0.4&quot;
+once_cell = &quot;1.18&quot;
+hostname = &quot;0.4.0&quot;
+ignore = &quot;0.4.21&quot;
+tabled = &quot;0.18.0&quot;
+tokenizers = { version = &quot;0.21.1&quot;,  features = [&quot;http&quot;] }
+strum = { version = &quot;0.27.1&quot;, features = [&quot;derive&quot;] }
+reqwest = { version = &quot;0.12.15&quot;, features = [&quot;json&quot;, &quot;blocking&quot;] }
+serde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }
+serde_json = &quot;1.0&quot;
+tiktoken-rs = &quot;0.6.0&quot;
+dirs = &quot;5.0.1&quot;
+
+[dev-dependencies]
+tempfile = &quot;3.8&quot;
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = &quot;abort&quot;
+strip = true
 </content>
       </file>
     </contents>

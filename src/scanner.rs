@@ -20,6 +20,7 @@ use crate::types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node
 use crate::utils::{format_file_size, DEFAULT_IGNORE};
 
 use crate::report::FileReportInfo;
+use crate::tokenizer::{create_tokenizer, Tokenizer};
 
 /// Scanner statistics
 #[derive(Debug, Clone, Default)]
@@ -30,8 +31,14 @@ pub struct ScannerStatistics {
     pub total_lines: usize,
     /// Total number of characters
     pub total_chars: usize,
+    /// Total number of tokens (if tokenizer is enabled)
+    pub total_tokens: Option<usize>,
     /// Details for each file
     pub file_details: HashMap<String, FileReportInfo>,
+    /// Token cache hits (if tokenizer caching is enabled)
+    pub token_cache_hits: Option<usize>,
+    /// Token cache misses (if tokenizer caching is enabled)
+    pub token_cache_misses: Option<usize>,
 }
 
 /// Scanner for directory contents
@@ -42,21 +49,50 @@ pub struct Scanner {
     pub progress: Arc<ProgressBar>,
     /// Scanner statistics
     statistics: Arc<Mutex<ScannerStatistics>>,
+    /// Tokenizer (if enabled)
+    tokenizer: Option<Box<dyn Tokenizer>>,
 }
 
 impl Scanner {
     /// Create a new scanner
     pub fn new(config: Config, progress: Arc<ProgressBar>) -> Self {
+        // Create tokenizer if model is specified
+        let tokenizer = if let Some(model) = config.model {
+            let project_dir = config.target_dir.to_string_lossy().to_string();
+            match create_tokenizer(model, &project_dir) {
+                Ok(t) => {
+                    progress.set_message(format!("Using tokenizer for model: {model:?}"));
+                    Some(t)
+                }
+                Err(e) => {
+                    eprintln!("Error creating tokenizer: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Self {
             config,
             progress,
             statistics: Arc::new(Mutex::new(ScannerStatistics::default())),
+            tokenizer,
         }
     }
 
     /// Get scanner statistics
     pub fn get_statistics(&self) -> ScannerStatistics {
-        self.statistics.lock().unwrap().clone()
+        let mut stats = self.statistics.lock().unwrap().clone();
+        
+        // If we have a tokenizer, get cache stats from global counters
+        if self.tokenizer.is_some() {
+            let (hits, misses) = crate::tokenizer::CachedTokenizer::get_global_cache_stats();
+            stats.token_cache_hits = Some(hits);
+            stats.token_cache_misses = Some(misses);
+        }
+        
+        stats
     }
 
     /// Scan the target directory and return the directory tree
@@ -243,9 +279,14 @@ impl Scanner {
                 {
                     let mut stats = self.statistics.lock().unwrap();
                     stats.files_processed += 1;
-                    stats
-                        .file_details
-                        .insert(file_path, FileReportInfo { lines: 0, chars: 0 });
+                    stats.file_details.insert(
+                        file_path,
+                        FileReportInfo {
+                            lines: 0,
+                            chars: 0,
+                            tokens: None,
+                        },
+                    );
                 }
 
                 Ok(Node::Binary(BinaryNode {
@@ -266,6 +307,7 @@ impl Scanner {
                         FileReportInfo {
                             lines: 0,
                             chars: target.chars().count(),
+                            tokens: None,
                         },
                     );
                 }
@@ -401,9 +443,14 @@ impl Scanner {
             {
                 let mut stats = self.statistics.lock().unwrap();
                 stats.files_processed += 1;
-                stats
-                    .file_details
-                    .insert(file_path, FileReportInfo { lines: 0, chars: 0 });
+                stats.file_details.insert(
+                    file_path,
+                    FileReportInfo {
+                        lines: 0,
+                        chars: 0,
+                        tokens: None,
+                    },
+                );
             }
 
             return Ok(Some(message));
@@ -436,17 +483,37 @@ impl Scanner {
                     return Ok(Some(format!("Failed to read file content: {}", e)));
                 }
 
+                // Count tokens if tokenizer is enabled
+                let token_count = if let Some(tokenizer) = &self.tokenizer {
+                    match tokenizer.count_tokens(&content) {
+                        Ok(count) => Some(count.tokens),
+                        Err(e) => {
+                            eprintln!("Error counting tokens for {}: {}", path.display(), e);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
                 // Update statistics
                 {
                     let mut stats = self.statistics.lock().unwrap();
                     stats.files_processed += 1;
                     stats.total_lines += line_count;
                     stats.total_chars += char_count;
+
+                    // Update token count if available
+                    if let Some(tokens) = token_count {
+                        stats.total_tokens = Some(stats.total_tokens.unwrap_or(0) + tokens);
+                    }
+
                     stats.file_details.insert(
                         file_path,
                         FileReportInfo {
                             lines: line_count,
                             chars: char_count,
+                            tokens: token_count,
                         },
                     );
                 }

@@ -20,6 +20,8 @@ pub struct FileReportInfo {
     pub lines: usize,
     /// Number of characters in the file
     pub chars: usize,
+    /// Number of tokens in the file (if tokenizer is enabled)
+    pub tokens: Option<usize>,
 }
 
 /// Statistics for a directory scan
@@ -35,8 +37,14 @@ pub struct ScanReport {
     pub total_lines: usize,
     /// Total number of characters
     pub total_chars: usize,
+    /// Total number of tokens (if tokenizer is enabled)
+    pub total_tokens: Option<usize>,
     /// Details for each file
     pub file_details: HashMap<String, FileReportInfo>,
+    /// Token cache hits (if tokenizer caching is enabled)
+    pub token_cache_hits: Option<usize>,
+    /// Token cache misses (if tokenizer caching is enabled)
+    pub token_cache_misses: Option<usize>,
 }
 
 /// Format of the report output
@@ -170,16 +178,33 @@ impl Reporter {
             value: self.format_number(report.total_lines),
         });
 
-        // Calculate token estimate
-        let estimated_tokens = report.total_chars / 4;
-        let formatted_tokens = self.format_number(estimated_tokens);
-
-        let token_usage = format!("{} tokens", formatted_tokens);
+        // Use actual token count if available, otherwise use estimate
+        let token_text = if let Some(tokens) = report.total_tokens {
+            format!("{} tokens (counted)", self.format_number(tokens))
+        } else {
+            let estimated_tokens = report.total_chars / 4;
+            format!("{} tokens (estimated)", self.format_number(estimated_tokens))
+        };
 
         rows.push(SummaryRow {
-            key: "📦 Estimated LLM Tokens".to_string(),
-            value: token_usage,
+            key: "📦 LLM Tokens".to_string(),
+            value: token_text,
         });
+        
+        // Add cache statistics if available
+        if let (Some(hits), Some(misses)) = (report.token_cache_hits, report.token_cache_misses) {
+            let total = hits + misses;
+            let hit_rate = if total > 0 {
+                format!("{:.1}%", (hits as f64 / total as f64) * 100.0)
+            } else {
+                "0.0%".to_string()
+            };
+            
+            rows.push(SummaryRow {
+                key: "🔄 Cache Hit Rate".to_string(),
+                value: format!("{} ({} hits / {} total)", hit_rate, hits, total),
+            });
+        }
 
         // Create and style the table
         let mut table = Table::new(rows);
@@ -224,12 +249,18 @@ impl Reporter {
                 // Format and truncate path if needed
                 let display_path = self.format_path(path, 60);
 
-                let estimated_tokens = info.chars / 4;
+                // Use actual token count if available, otherwise estimate
+                let token_count = if let Some(tokens) = info.tokens {
+                    self.format_number(tokens)
+                } else {
+                    let estimated_tokens = info.chars / 4;
+                    self.format_number(estimated_tokens)
+                };
 
                 FileRow {
                     path: display_path,
                     lines: self.format_number(info.lines),
-                    tokens: self.format_number(estimated_tokens),
+                    tokens: token_count,
                 }
             })
             .collect();
