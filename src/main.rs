@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 
+use dumpfs::clipboard;
 use dumpfs::error::{DumpFsError, Result};
 
 use clap::{CommandFactory, Parser};
@@ -399,6 +400,23 @@ fn main() -> Result<()> {
     // Create a reporter and print the report
     let reporter = Reporter::new(ReportFormat::ConsoleTable);
     reporter.print_report(&scan_report);
+
+    // Handle clipboard functionality if --clip is specified
+    if config.clip {
+        // Get the output file content
+        let output_content = std::fs::read_to_string(&config.output_file)?;
+
+        // Copy to clipboard
+        match clipboard::copy_to_clipboard(&output_content) {
+            Ok(_) => {
+                eprintln!("✅ Output copied to clipboard successfully");
+            }
+            Err(e) => {
+                eprintln!("❌ Failed to copy to clipboard: {}", e);
+                // Don't return error as the main functionality (file generation) succeeded
+            }
+        }
+    }
 
     Ok(())
 }

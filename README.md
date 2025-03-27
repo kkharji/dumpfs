@@ -44,6 +44,7 @@ OPTIONS:
     --model <MODEL>                              LLM model to use for tokenization
     --generate <SHELL>                           Generate shell completions (bash, zsh, fish, etc.)
     --clean-cache <DAYS>                         Clean Git repository cache older than DAYS (0 for all)
+    --clip                                       Copy output to system clipboard
 ```
 
 ### Supported Models
@@ -141,6 +142,9 @@ dumpfs --gitignore-path /path/to/custom/gitignore
 
 # Use specific model for token counting with caching
 dumpfs --model gpt4o
+
+# Copy the output XML to system clipboard
+dumpfs --clip
 
 # Clean Git repository cache older than 30 days
 dumpfs --clean-cache 30

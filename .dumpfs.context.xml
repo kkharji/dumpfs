@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<directory_scan timestamp="2025-03-27T22:49:42.939302489+03:00">
+<directory_scan timestamp="2025-03-28T00:14:04.393260960+03:00">
   <system_info>
     <hostname>penzu</hostname>
     <os>linux</os>
@@ -7,15 +7,15 @@
   </system_info>
   <directory name="dumpfs" path="dumpfs">
     <metadata>
-      <size>154</size>
-      <modified>2025-03-27T21:34:36.010944886+03:00</modified>
+      <size>164</size>
+      <modified>2025-03-28T00:13:54.360042125+03:00</modified>
       <permissions>755</permissions>
     </metadata>
     <contents>
       <directory name="src" path="/home/user/projs/dumpfs/src">
         <metadata>
-          <size>172</size>
-          <modified>2025-03-27T22:40:39.226377383+03:00</modified>
+          <size>222</size>
+          <modified>2025-03-27T23:46:18.089401758+03:00</modified>
           <permissions>755</permissions>
         </metadata>
         <contents>
@@ -140,8 +140,8 @@ where
               </file>
               <file name="url.rs" path="/home/user/projs/dumpfs/src/git/url.rs">
                 <metadata>
-                  <size>9060</size>
-                  <modified>2025-03-27T22:14:42.605872078+03:00</modified>
+                  <size>9270</size>
+                  <modified>2025-03-27T23:26:19.612470211+03:00</modified>
                   <permissions>644</permissions>
                 </metadata>
                 <content>/*!
@@ -162,16 +162,18 @@ static HTTP_REGEX: Lazy&lt;Regex&gt; = Lazy::new(|| {
     Regex::new(
         r&quot;^https?://(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org|.*)/[^/]+/[^/]+(?:\.git)?$&quot;,
     )
-    .unwrap()
+    .expect(&quot;HTTP URL regex pattern should be valid&quot;)
 });
 
 static SSH_REGEX: Lazy&lt;Regex&gt; = Lazy::new(|| {
     Regex::new(r&quot;^git@(?:github\.com|gitlab\.com|bitbucket\.org|[^:]+):[^/]+/[^/]+(?:\.git)?$&quot;)
-        .unwrap()
+        .expect(&quot;SSH URL regex pattern should be valid&quot;)
 });
 
-static SSH_PARSE_REGEX: Lazy&lt;Regex&gt; =
-    Lazy::new(|| Regex::new(r&quot;^git@([^:]+):([^/]+)/([^/]+)(?:\.git)?$&quot;).unwrap());
+static SSH_PARSE_REGEX: Lazy&lt;Regex&gt; = Lazy::new(|| {
+    Regex::new(r&quot;^git@([^:]+):([^/]+)/([^/]+)(?:\.git)?$&quot;)
+        .expect(&quot;SSH parse regex pattern should be valid&quot;)
+});
 
 /// Git hosting platform types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -236,7 +238,7 @@ impl FromStr for GitRepoInfo {
 
                 // Get path without leading slash
                 let path = parsed_url.path();
-                let path = path.strip_prefix(&apos;/&apos;).unwrap_or(path);
+                let path = path.strip_prefix(&apos;/&apos;).unwrap_or(path); // Safe unwrap since we&apos;re providing a fallback
 
                 let path_segments: Vec&lt;&amp;str&gt; = path.split(&apos;/&apos;).collect();
 
@@ -325,7 +327,7 @@ pub fn parse_git_url(url: &amp;str) -&gt; GitResult&lt;GitRepoInfo&gt; {
 
 /// Get the cache directory path for a repository
 pub fn get_cache_path(host: &amp;GitHost, owner: &amp;str, name: &amp;str) -&gt; PathBuf {
-    let mut cache_dir = dirs::cache_dir().unwrap_or_else(|| PathBuf::from(&quot;~/.cache&quot;));
+    let mut cache_dir = dirs::cache_dir().unwrap_or_else(|| PathBuf::from(&quot;~/.cache&quot;)); // Safe unwrap with fallback
     cache_dir = cache_dir.join(&quot;dumpfs&quot;);
 
     match host {
@@ -547,8 +549,8 @@ mod tests {
               </file>
               <file name="repository.rs" path="/home/user/projs/dumpfs/src/git/repository.rs">
                 <metadata>
-                  <size>6664</size>
-                  <modified>2025-03-27T22:14:42.603872082+03:00</modified>
+                  <size>6808</size>
+                  <modified>2025-03-27T23:26:19.610470211+03:00</modified>
                   <permissions>644</permissions>
                 </metadata>
                 <content>/*!
@@ -664,9 +666,13 @@ impl Repository {
             .map_err(GitError::FetchError)?;
 
         // Get object to reset to
+        let branch_name = remote_branch.name().ok_or_else(|| {
+            GitError::FetchError(git2::Error::from_str(&quot;Failed to get branch name&quot;))
+        })?;
+
         let obj = self
             .inner
-            .revparse_single(remote_branch.name().unwrap())
+            .revparse_single(branch_name)
             .map_err(GitError::FetchError)?;
 
         // Reset to remote branch
@@ -855,46 +861,22 @@ mod tests {
           </directory>
           <directory name="tokenizer" path="/home/user/projs/dumpfs/src/tokenizer">
             <metadata>
-              <size>114</size>
-              <modified>2025-03-27T22:45:06.431237412+03:00</modified>
+              <size>76</size>
+              <modified>2025-03-27T22:51:17.106978586+03:00</modified>
               <permissions>755</permissions>
             </metadata>
             <contents>
               <directory name="provider" path="/home/user/projs/dumpfs/src/tokenizer/provider">
                 <metadata>
                   <size>82</size>
-                  <modified>2025-03-27T22:32:13.770964825+03:00</modified>
+                  <modified>2025-03-27T22:51:17.106978586+03:00</modified>
                   <permissions>755</permissions>
                 </metadata>
                 <contents>
-                  <file name="mod.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/mod.rs">
-                    <metadata>
-                      <size>454</size>
-                      <modified>2025-03-27T22:43:23.364948563+03:00</modified>
-                      <permissions>644</permissions>
-                    </metadata>
-                    <content>//! Provider implementations for different tokenizer backends
-
-pub mod anthropic;
-pub mod huggingface;
-pub mod openai;
-
-use crate::tokenizer::error::TokenizerResult;
-
-/// Trait for tokenizer provider implementations
-pub trait Provider: Send + Sync {
-    /// Count tokens in the given text
-    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;usize&gt;;
-
-    /// Get the context window size for this model
-    fn model_context_window(&amp;self) -&gt; usize;
-}
-</content>
-                  </file>
                   <file name="anthropic.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/anthropic.rs">
                     <metadata>
                       <size>2249</size>
-                      <modified>2025-03-27T22:43:23.364948563+03:00</modified>
+                      <modified>2025-03-27T22:51:17.106978586+03:00</modified>
                       <permissions>644</permissions>
                     </metadata>
                     <content>//! Anthropic Claude tokenizer implementation
@@ -979,52 +961,10 @@ impl Provider for ClaudeProvider {
 }
 </content>
                   </file>
-                  <file name="openai.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/openai.rs">
-                    <metadata>
-                      <size>901</size>
-                      <modified>2025-03-27T22:43:23.364948563+03:00</modified>
-                      <permissions>644</permissions>
-                    </metadata>
-                    <content>//! OpenAI tokenizer implementation using tiktoken
-
-use tiktoken_rs::CoreBPE;
-
-use super::Provider;
-use crate::tokenizer::error::{TokenizerError, TokenizerResult};
-use crate::tokenizer::model::Model;
-
-/// OpenAI tokenizer implementation
-pub struct OpenAIProvider {
-    model: Model,
-    encoding: CoreBPE,
-}
-
-impl OpenAIProvider {
-    /// Create a new OpenAI tokenizer
-    pub fn new(model: Model) -&gt; TokenizerResult&lt;Self&gt; {
-        let encoding = tiktoken_rs::get_bpe_from_model(model.model_id())
-            .map_err(|e| TokenizerError::TokenizerError(e.to_string()))?;
-
-        Ok(Self { model, encoding })
-    }
-}
-
-impl Provider for OpenAIProvider {
-    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;usize&gt; {
-        let tokens = self.encoding.encode_ordinary(text);
-        Ok(tokens.len())
-    }
-
-    fn model_context_window(&amp;self) -&gt; usize {
-        self.model.context_window()
-    }
-}
-</content>
-                  </file>
                   <file name="huggingface.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/huggingface.rs">
                     <metadata>
                       <size>2364</size>
-                      <modified>2025-03-27T22:43:23.364948563+03:00</modified>
+                      <modified>2025-03-27T22:51:17.106978586+03:00</modified>
                       <permissions>644</permissions>
                     </metadata>
                     <content>//! HuggingFace tokenizer implementation
@@ -1106,204 +1046,78 @@ impl Provider for HuggingFaceProvider {
 }
 </content>
                   </file>
+                  <file name="mod.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/mod.rs">
+                    <metadata>
+                      <size>454</size>
+                      <modified>2025-03-27T22:51:17.106978586+03:00</modified>
+                      <permissions>644</permissions>
+                    </metadata>
+                    <content>//! Provider implementations for different tokenizer backends
+
+pub mod anthropic;
+pub mod huggingface;
+pub mod openai;
+
+use crate::tokenizer::error::TokenizerResult;
+
+/// Trait for tokenizer provider implementations
+pub trait Provider: Send + Sync {
+    /// Count tokens in the given text
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;usize&gt;;
+
+    /// Get the context window size for this model
+    fn model_context_window(&amp;self) -&gt; usize;
+}
+</content>
+                  </file>
+                  <file name="openai.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/openai.rs">
+                    <metadata>
+                      <size>901</size>
+                      <modified>2025-03-27T22:51:17.106978586+03:00</modified>
+                      <permissions>644</permissions>
+                    </metadata>
+                    <content>//! OpenAI tokenizer implementation using tiktoken
+
+use tiktoken_rs::CoreBPE;
+
+use super::Provider;
+use crate::tokenizer::error::{TokenizerError, TokenizerResult};
+use crate::tokenizer::model::Model;
+
+/// OpenAI tokenizer implementation
+pub struct OpenAIProvider {
+    model: Model,
+    encoding: CoreBPE,
+}
+
+impl OpenAIProvider {
+    /// Create a new OpenAI tokenizer
+    pub fn new(model: Model) -&gt; TokenizerResult&lt;Self&gt; {
+        let encoding = tiktoken_rs::get_bpe_from_model(model.model_id())
+            .map_err(|e| TokenizerError::TokenizerError(e.to_string()))?;
+
+        Ok(Self { model, encoding })
+    }
+}
+
+impl Provider for OpenAIProvider {
+    fn count_tokens(&amp;self, text: &amp;str) -&gt; TokenizerResult&lt;usize&gt; {
+        let tokens = self.encoding.encode_ordinary(text);
+        Ok(tokens.len())
+    }
+
+    fn model_context_window(&amp;self) -&gt; usize {
+        self.model.context_window()
+    }
+}
+</content>
+                  </file>
                 </contents>
               </directory>
-              <file name="error.rs" path="/home/user/projs/dumpfs/src/tokenizer/error.rs">
-                <metadata>
-                  <size>1324</size>
-                  <modified>2025-03-27T22:43:23.362948557+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
-                <content>//! Error types for the tokenizer module
-
-use std::io;
-use thiserror::Error;
-
-/// Result type for tokenizer operations
-pub type TokenizerResult&lt;T&gt; = Result&lt;T, TokenizerError&gt;;
-
-/// Errors that can occur during tokenization
-#[derive(Error, Debug)]
-pub enum TokenizerError {
-    /// Error from API call
-    #[error(&quot;API error: {0}&quot;)]
-    ApiError(String),
-
-    /// Error from tokenizer library
-    #[error(&quot;Tokenizer error: {0}&quot;)]
-    TokenizerError(String),
-
-    /// Model is not supported
-    #[error(&quot;Unsupported model: {0}&quot;)]
-    UnsupportedModel(String),
-
-    /// Required environment variable not set
-    #[error(&quot;Environment variable not set: {0}&quot;)]
-    EnvVarError(String),
-
-    /// Cache operation error
-    #[error(&quot;Cache error: {0}&quot;)]
-    CacheError(String),
-
-    /// Failed to acquire lock on cache
-    #[error(&quot;Failed to acquire lock on cache&quot;)]
-    CacheLockError,
-
-    /// IO error
-    #[error(&quot;IO error: {0}&quot;)]
-    IoError(#[from] io::Error),
-
-    /// JSON serialization/deserialization error
-    #[error(&quot;JSON error: {0}&quot;)]
-    JsonError(#[from] serde_json::Error),
-
-    /// Request error
-    #[error(&quot;Request error: {0}&quot;)]
-    RequestError(String),
-}
-
-impl From&lt;reqwest::Error&gt; for TokenizerError {
-    fn from(error: reqwest::Error) -&gt; Self {
-        TokenizerError::RequestError(error.to_string())
-    }
-}
-</content>
-              </file>
-              <file name="model.rs" path="/home/user/projs/dumpfs/src/tokenizer/model.rs">
-                <metadata>
-                  <size>2984</size>
-                  <modified>2025-03-27T22:43:23.363948560+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
-                <content>//! Model definitions and metadata
-
-use clap::ValueEnum;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use strum::{Display, EnumIter, EnumProperty, EnumString};
-
-/// Supported LLM models for tokenization
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    EnumIter,
-    Display,
-    ValueEnum,
-    Serialize,
-    Deserialize,
-    EnumProperty,
-)]
-pub enum Model {
-    #[strum(props(
-        model_id = &quot;claude-3-5-sonnet-latest&quot;,
-        context_window = &quot;200000&quot;,
-        provider = &quot;anthropic&quot;
-    ))]
-    Sonnet35,
-
-    #[strum(props(
-        model_id = &quot;claude-3-7-sonnet-latest&quot;,
-        context_window = &quot;200000&quot;,
-        provider = &quot;anthropic&quot;
-    ))]
-    Sonnet37,
-
-    // OpenAI models
-    #[strum(props(model_id = &quot;gpt-4&quot;, context_window = &quot;8192&quot;, provider = &quot;openai&quot;))]
-    Gpt4,
-
-    #[strum(props(
-        model_id = &quot;gpt-4-0125-preview&quot;,
-        context_window = &quot;128000&quot;,
-        provider = &quot;openai&quot;
-    ))]
-    Gpt4Turbo,
-
-    #[strum(props(model_id = &quot;gpt-4o&quot;, context_window = &quot;8192&quot;, provider = &quot;openai&quot;))]
-    Gpt4o,
-
-    // HuggingFace models
-    #[strum(props(
-        model_id = &quot;meta-llama/Llama-2-7b-hf&quot;,
-        context_window = &quot;4096&quot;,
-        provider = &quot;huggingface&quot;
-    ))]
-    Llama2_7b,
-
-    #[strum(props(
-        model_id = &quot;meta-llama/Llama-3-8b-hf&quot;,
-        context_window = &quot;8192&quot;,
-        provider = &quot;huggingface&quot;
-    ))]
-    Llama3_8b,
-
-    #[strum(props(
-        model_id = &quot;mistralai/Mistral-Small-3.1-24B-Base-2503&quot;,
-        context_window = &quot;128000&quot;,
-        provider = &quot;huggingface&quot;
-    ))]
-    MistralSmall24B,
-
-    #[strum(props(
-        model_id = &quot;mistralai/Mistral-Large-Instruct-2411&quot;,
-        context_window = &quot;128000&quot;,
-        provider = &quot;huggingface&quot;
-    ))]
-    MistralLargeInstruct,
-
-    #[strum(props(
-        model_id = &quot;mistralai/Pixtral-12B-Base-2409&quot;,
-        context_window = &quot;128000&quot;,
-        provider = &quot;huggingface&quot;
-    ))]
-    Pixtral12B,
-
-    #[strum(props(
-        model_id = &quot;mistralai/Mistral-Small-Instruct-2409&quot;,
-        context_window = &quot;32000&quot;,
-        provider = &quot;huggingface&quot;
-    ))]
-    MistralSmall,
-}
-
-impl Model {
-    /// Get the context window size for this model
-    pub fn context_window(&amp;self) -&gt; usize {
-        self.get_int(&quot;context_window&quot;).unwrap_or(0) as usize
-    }
-
-    /// Get the provider of this model
-    pub fn provider(&amp;self) -&gt; ModelProvider {
-        let provider = self.get_str(&quot;provider&quot;).unwrap_or(&quot;unknown&quot;);
-        ModelProvider::from_str(provider).unwrap_or(ModelProvider::HuggingFace)
-    }
-
-    /// Get the model identifier as used by the provider&apos;s API
-    pub fn model_id(&amp;self) -&gt; &amp;&apos;static str {
-        self.get_str(&quot;model_id&quot;).unwrap_or(&quot;unknown&quot;)
-    }
-}
-
-/// Model providers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, Display)]
-#[strum(serialize_all = &quot;lowercase&quot;)]
-pub enum ModelProvider {
-    /// Anthropic (Claude models)
-    Anthropic,
-    /// OpenAI (GPT models)
-    OpenAI,
-    /// HuggingFace models
-    HuggingFace,
-}
-</content>
-              </file>
               <file name="cache.rs" path="/home/user/projs/dumpfs/src/tokenizer/cache.rs">
                 <metadata>
                   <size>6854</size>
-                  <modified>2025-03-27T22:43:23.361948554+03:00</modified>
+                  <modified>2025-03-27T22:51:17.106978586+03:00</modified>
                   <permissions>644</permissions>
                 </metadata>
                 <content>//! Token cache implementation
@@ -1553,10 +1367,71 @@ pub fn get_cache_path(project_dir: &amp;str) -&gt; TokenizerResult&lt;PathBuf&gt
 }
 </content>
               </file>
+              <file name="error.rs" path="/home/user/projs/dumpfs/src/tokenizer/error.rs">
+                <metadata>
+                  <size>1324</size>
+                  <modified>2025-03-27T22:51:17.106978586+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>//! Error types for the tokenizer module
+
+use std::io;
+use thiserror::Error;
+
+/// Result type for tokenizer operations
+pub type TokenizerResult&lt;T&gt; = Result&lt;T, TokenizerError&gt;;
+
+/// Errors that can occur during tokenization
+#[derive(Error, Debug)]
+pub enum TokenizerError {
+    /// Error from API call
+    #[error(&quot;API error: {0}&quot;)]
+    ApiError(String),
+
+    /// Error from tokenizer library
+    #[error(&quot;Tokenizer error: {0}&quot;)]
+    TokenizerError(String),
+
+    /// Model is not supported
+    #[error(&quot;Unsupported model: {0}&quot;)]
+    UnsupportedModel(String),
+
+    /// Required environment variable not set
+    #[error(&quot;Environment variable not set: {0}&quot;)]
+    EnvVarError(String),
+
+    /// Cache operation error
+    #[error(&quot;Cache error: {0}&quot;)]
+    CacheError(String),
+
+    /// Failed to acquire lock on cache
+    #[error(&quot;Failed to acquire lock on cache&quot;)]
+    CacheLockError,
+
+    /// IO error
+    #[error(&quot;IO error: {0}&quot;)]
+    IoError(#[from] io::Error),
+
+    /// JSON serialization/deserialization error
+    #[error(&quot;JSON error: {0}&quot;)]
+    JsonError(#[from] serde_json::Error),
+
+    /// Request error
+    #[error(&quot;Request error: {0}&quot;)]
+    RequestError(String),
+}
+
+impl From&lt;reqwest::Error&gt; for TokenizerError {
+    fn from(error: reqwest::Error) -&gt; Self {
+        TokenizerError::RequestError(error.to_string())
+    }
+}
+</content>
+              </file>
               <file name="mod.rs" path="/home/user/projs/dumpfs/src/tokenizer/mod.rs">
                 <metadata>
-                  <size>7529</size>
-                  <modified>2025-03-27T22:43:23.363948560+03:00</modified>
+                  <size>7792</size>
+                  <modified>2025-03-28T00:01:34.065338479+03:00</modified>
                   <permissions>644</permissions>
                 </metadata>
                 <content>//! Tokenizer module for token counting with different LLM models
@@ -1698,6 +1573,8 @@ impl Tokenizer for CachingTokenizer {
 
 #[cfg(test)]
 mod tests {
+    use tempfile::tempdir;
+
     use super::*;
     use crate::tokenizer::error::TokenizerResult;
     use std::env;
@@ -1736,7 +1613,7 @@ mod tests {
         let result = tokenizer.count_tokens(&quot;Hello, world!&quot;);
         assert!(result.is_ok());
 
-        let count = result.unwrap();
+        let count = result.expect(&quot;Token count should be valid in test environment&quot;);
         assert_eq!(count.tokens, 42);
     }
 
@@ -1797,25 +1674,27 @@ mod tests {
         // First call should be a cache miss
         let (count1, cached1) = tokenizer.count_tokens(&quot;Hello, world!&quot;);
         assert_eq!(count1, 42);
-        assert_eq!(cached1, false);
+        assert!(!cached1);
 
         // Second call should be a cache hit
         let (count2, cached2) = tokenizer.count_tokens(&quot;Hello, world!&quot;);
         assert_eq!(count2, 42);
-        assert_eq!(cached2, true);
+        assert!(cached2);
     }
 
     #[test]
     #[ignore] // Skip this test by default since it requires an API key
     fn test_claude_tokenizer() {
+        let tmp_dir = tempdir().expect(&quot;Should create temp dir&quot;);
+        let test_dir = tmp_dir.path().to_str().unwrap();
+
         // Only run this test if ANTHROPIC_API_KEY is set
         match env::var(&quot;ANTHROPIC_API_KEY&quot;) {
             Ok(api_key) if !api_key.is_empty() =&gt; {
-                let tokenizer = create_tokenizer(Model::Sonnet37, &quot;test_dir&quot;).unwrap();
+                let tokenizer = create_tokenizer(Model::Sonnet37, test_dir)
+                    .expect(&quot;Tokenizer creation should succeed when API key is set&quot;);
                 let result = tokenizer.count_tokens(&quot;Hello, Claude!&quot;);
-
-                assert!(result.is_ok());
-                let count = result.unwrap();
+                let count = result.expect(&quot;Token count should be valid with valid API key&quot;);
                 assert!(count.tokens &gt; 0);
             }
             _ =&gt; {
@@ -1827,6 +1706,146 @@ mod tests {
 }
 </content>
               </file>
+              <file name="model.rs" path="/home/user/projs/dumpfs/src/tokenizer/model.rs">
+                <metadata>
+                  <size>2984</size>
+                  <modified>2025-03-27T22:51:17.106978586+03:00</modified>
+                  <permissions>644</permissions>
+                </metadata>
+                <content>//! Model definitions and metadata
+
+use clap::ValueEnum;
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+use strum::{Display, EnumIter, EnumProperty, EnumString};
+
+/// Supported LLM models for tokenization
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    EnumIter,
+    Display,
+    ValueEnum,
+    Serialize,
+    Deserialize,
+    EnumProperty,
+)]
+pub enum Model {
+    #[strum(props(
+        model_id = &quot;claude-3-5-sonnet-latest&quot;,
+        context_window = &quot;200000&quot;,
+        provider = &quot;anthropic&quot;
+    ))]
+    Sonnet35,
+
+    #[strum(props(
+        model_id = &quot;claude-3-7-sonnet-latest&quot;,
+        context_window = &quot;200000&quot;,
+        provider = &quot;anthropic&quot;
+    ))]
+    Sonnet37,
+
+    // OpenAI models
+    #[strum(props(model_id = &quot;gpt-4&quot;, context_window = &quot;8192&quot;, provider = &quot;openai&quot;))]
+    Gpt4,
+
+    #[strum(props(
+        model_id = &quot;gpt-4-0125-preview&quot;,
+        context_window = &quot;128000&quot;,
+        provider = &quot;openai&quot;
+    ))]
+    Gpt4Turbo,
+
+    #[strum(props(model_id = &quot;gpt-4o&quot;, context_window = &quot;8192&quot;, provider = &quot;openai&quot;))]
+    Gpt4o,
+
+    // HuggingFace models
+    #[strum(props(
+        model_id = &quot;meta-llama/Llama-2-7b-hf&quot;,
+        context_window = &quot;4096&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    Llama2_7b,
+
+    #[strum(props(
+        model_id = &quot;meta-llama/Llama-3-8b-hf&quot;,
+        context_window = &quot;8192&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    Llama3_8b,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Small-3.1-24B-Base-2503&quot;,
+        context_window = &quot;128000&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralSmall24B,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Large-Instruct-2411&quot;,
+        context_window = &quot;128000&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralLargeInstruct,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Pixtral-12B-Base-2409&quot;,
+        context_window = &quot;128000&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    Pixtral12B,
+
+    #[strum(props(
+        model_id = &quot;mistralai/Mistral-Small-Instruct-2409&quot;,
+        context_window = &quot;32000&quot;,
+        provider = &quot;huggingface&quot;
+    ))]
+    MistralSmall,
+}
+
+impl Model {
+    /// Get the context window size for this model
+    pub fn context_window(&amp;self) -&gt; usize {
+        self.get_int(&quot;context_window&quot;).unwrap_or(0) as usize
+    }
+
+    /// Get the provider of this model
+    pub fn provider(&amp;self) -&gt; ModelProvider {
+        let provider = self.get_str(&quot;provider&quot;).unwrap_or(&quot;unknown&quot;);
+        ModelProvider::from_str(provider).unwrap_or(ModelProvider::HuggingFace)
+    }
+
+    /// Get the model identifier as used by the provider&apos;s API
+    pub fn model_id(&amp;self) -&gt; &amp;&apos;static str {
+        self.get_str(&quot;model_id&quot;).unwrap_or(&quot;unknown&quot;)
+    }
+}
+
+/// Model providers
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, Display)]
+#[strum(serialize_all = &quot;lowercase&quot;)]
+pub enum ModelProvider {
+    /// Anthropic (Claude models)
+    Anthropic,
+    /// OpenAI (GPT models)
+    OpenAI,
+    /// HuggingFace models
+    HuggingFace,
+}
+</content>
+              </file>
+            </contents>
+          </directory>
+          <directory name="tests" path="/home/user/projs/dumpfs/src/tests">
+            <metadata>
+              <size>0</size>
+              <modified>2025-03-27T23:46:30.882373435+03:00</modified>
+              <permissions>755</permissions>
+            </metadata>
+            <contents>
             </contents>
           </directory>
           <file name="types.rs" path="/home/user/projs/dumpfs/src/types.rs">
@@ -2406,8 +2425,8 @@ impl XmlWriter {
           </file>
           <file name="config.rs" path="/home/user/projs/dumpfs/src/config.rs">
             <metadata>
-              <size>5919</size>
-              <modified>2025-03-27T22:14:42.600872087+03:00</modified>
+              <size>6116</size>
+              <modified>2025-03-27T23:46:55.250321209+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -2492,6 +2511,10 @@ pub struct Args {
     /// Policy for handling Git repository caching
     #[clap(long, value_enum, default_value_t = GitCachePolicy::default())]
     pub git_cache_policy: GitCachePolicy,
+
+    /// Copy output to clipboard
+    #[clap(long, help = &quot;Copy output to system clipboard&quot;)]
+    pub clip: bool,
 }
 
 /// Application configuration
@@ -2529,6 +2552,9 @@ pub struct Config {
 
     /// Policy for handling Git repository caching
     pub git_cache_policy: GitCachePolicy,
+
+    /// Copy output to clipboard
+    pub clip: bool,
 }
 
 impl Config {
@@ -2546,6 +2572,7 @@ impl Config {
             repo_url: None,
             git_repo: None,
             git_cache_policy: args.git_cache_policy,
+            clip: args.clip,
         }
     }
 
@@ -2600,8 +2627,8 @@ impl Config {
           </file>
           <file name="lib.rs" path="/home/user/projs/dumpfs/src/lib.rs">
             <metadata>
-              <size>819</size>
-              <modified>2025-03-27T19:56:57.179696789+03:00</modified>
+              <size>958</size>
+              <modified>2025-03-27T23:36:37.252491301+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -2611,7 +2638,9 @@ impl Config {
  * for use as context for Large Language Models.
  */
 
+pub mod clipboard;
 pub mod config;
+pub mod error;
 pub mod git;
 pub mod report;
 pub mod scanner;
@@ -2624,7 +2653,9 @@ pub mod writer;
 mod tests;
 
 // Re-export main components for easier access
+pub use clipboard::{copy_to_clipboard, ClipboardError};
 pub use config::Config;
+pub use error::{DumpFsError, Result, ResultExt};
 pub use report::{FileReportInfo, ReportFormat, Reporter, ScanReport};
 pub use scanner::Scanner;
 pub use types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
@@ -2639,8 +2670,8 @@ pub const VERSION: &amp;str = env!(&quot;CARGO_PKG_VERSION&quot;);
           </file>
           <file name="main.rs" path="/home/user/projs/dumpfs/src/main.rs">
             <metadata>
-              <size>13731</size>
-              <modified>2025-03-27T22:27:17.652102816+03:00</modified>
+              <size>14446</size>
+              <modified>2025-03-27T23:46:41.813349730+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -2651,6 +2682,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
+
+use dumpfs::clipboard;
+use dumpfs::error::{DumpFsError, Result};
 
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, CompleteEnv, Shell};
@@ -2688,17 +2722,15 @@ fn process_path(
     path: &amp;str,
     git_cache_policy: GitCachePolicy,
     progress: Option&lt;&amp;ProgressBar&gt;,
-) -&gt; io::Result&lt;(PathBuf, Option&lt;String&gt;, Option&lt;GitRepoInfo&gt;)&gt; {
+) -&gt; Result&lt;(PathBuf, Option&lt;String&gt;, Option&lt;GitRepoInfo&gt;)&gt; {
     // If not a Git URL, just return the path as is
     if !git::is_git_url(path) {
         return Ok((PathBuf::from(path), None, None));
     }
 
     // Parse the Git URL
-    let repo_info = match git::parse_git_url(path) {
-        Ok(info) =&gt; info,
-        Err(e) =&gt; return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string())),
-    };
+    let repo_info = git::parse_git_url(path)
+        .map_err(|e| DumpFsError::InvalidArgument(format!(&quot;Invalid Git URL: {}&quot;, e)))?;
 
     // Create a progress reporter adapter
     struct ProgressBarAdapter&lt;&apos;a&gt; {
@@ -2734,9 +2766,11 @@ fn process_path(
         None =&gt; {
             // Create a new progress bar if none is provided
             let new_bar = ProgressBar::new(100);
-            new_bar.set_style(ProgressStyle::default_bar()
-                .template(&quot;{spinner:.green} {prefix:.bold.cyan} {msg} [{bar:40.cyan/blue}] {percent}%&quot;)
-                .unwrap());
+            new_bar.set_style(
+                ProgressStyle::default_bar()
+                    .template(&quot;{spinner:.green} {prefix:.bold.cyan} {msg} [{bar:40.cyan/blue}] {percent}%&quot;)
+                    .map_err(|e| DumpFsError::Unexpected(format!(&quot;Failed to create progress bar style: {}&quot;, e)))?
+            );
 
             // Since this is a temporary variable, we&apos;ll just leak it to avoid ownership issues
             Box::leak(Box::new(new_bar))
@@ -2762,20 +2796,21 @@ fn process_path(
                 is_clone: true,
             };
 
-            match git::Repository::clone(repo_info.clone(), Some(&amp;reporter)) {
+            let repo = match git::Repository::clone(repo_info.clone(), Some(&amp;reporter)) {
                 Ok(repo) =&gt; {
                     progress_bar.finish_with_message(format!(
                         &quot;Repository cloned: {}/{}&quot;,
                         repo_info.owner, repo_info.name
                     ));
-
-                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+                    repo
                 }
                 Err(e) =&gt; {
                     progress_bar.abandon_with_message(format!(&quot;Failed to clone repository: {}&quot;, e));
-                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                    return Err(DumpFsError::Git(e));
                 }
-            }
+            };
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
         }
 
         // Force clone even if exists
@@ -2791,10 +2826,7 @@ fn process_path(
             if let Err(e) = std::fs::remove_dir_all(&amp;repo_info.cache_path) {
                 progress_bar
                     .abandon_with_message(format!(&quot;Failed to remove existing repository: {}&quot;, e));
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!(&quot;Failed to remove directory: {}&quot;, e),
-                ));
+                return Err(DumpFsError::Io(e));
             }
 
             // Clone the repository
@@ -2810,20 +2842,21 @@ fn process_path(
                 is_clone: true,
             };
 
-            match git::Repository::clone(repo_info.clone(), Some(&amp;reporter)) {
+            let repo = match git::Repository::clone(repo_info.clone(), Some(&amp;reporter)) {
                 Ok(repo) =&gt; {
                     progress_bar.finish_with_message(format!(
                         &quot;Repository cloned: {}/{}&quot;,
                         repo_info.owner, repo_info.name
                     ));
-
-                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+                    repo
                 }
                 Err(e) =&gt; {
                     progress_bar.abandon_with_message(format!(&quot;Failed to clone repository: {}&quot;, e));
-                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                    return Err(DumpFsError::Git(e));
                 }
-            }
+            };
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
         }
 
         // Pull if exists
@@ -2840,26 +2873,25 @@ fn process_path(
                 is_clone: false,
             };
 
-            match git::Repository::open(repo_info.clone()) {
-                Ok(mut repo) =&gt; {
-                    if let Err(e) = repo.pull(Some(&amp;reporter)) {
-                        progress_bar
-                            .abandon_with_message(format!(&quot;Failed to update repository: {}&quot;, e));
-                        return Err(io::Error::new(io::ErrorKind::Other, e.to_string()));
-                    }
-
-                    progress_bar.finish_with_message(format!(
-                        &quot;Repository updated: {}/{}&quot;,
-                        repo_info.owner, repo_info.name
-                    ));
-
-                    Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
-                }
+            let mut repo = match git::Repository::open(repo_info.clone()) {
+                Ok(repo) =&gt; repo,
                 Err(e) =&gt; {
                     progress_bar.abandon_with_message(format!(&quot;Failed to open repository: {}&quot;, e));
-                    Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                    return Err(DumpFsError::Git(e));
                 }
+            };
+
+            if let Err(e) = repo.pull(Some(&amp;reporter)) {
+                progress_bar.abandon_with_message(format!(&quot;Failed to update repository: {}&quot;, e));
+                return Err(DumpFsError::Git(e));
             }
+
+            progress_bar.finish_with_message(format!(
+                &quot;Repository updated: {}/{}&quot;,
+                repo_info.owner, repo_info.name
+            ));
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
         }
 
         // Use cache without pulling
@@ -2884,7 +2916,7 @@ fn process_path(
     }
 }
 
-fn main() -&gt; io::Result&lt;()&gt; {
+fn main() -&gt; Result&lt;()&gt; {
     // Enable automatic shell completion
     CompleteEnv::with_factory(Args::command).complete();
 
@@ -2912,16 +2944,18 @@ fn main() -&gt; io::Result&lt;()&gt; {
             }
             Err(e) =&gt; {
                 eprintln!(&quot;Error cleaning cache: {}&quot;, e);
-                return Err(e);
+                return Err(DumpFsError::Io(e));
             }
         }
     }
 
     // Create progress bar with advanced Unicode styling
     let progress = ProgressBar::new(0);
-    progress.set_style(ProgressStyle::default_bar()
-        .template(&quot;{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white} {pos}/{len} ({percent}%) ⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s&quot;)
-        .unwrap());
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template(&quot;{spinner:.green} {prefix:.bold.cyan} {wide_msg:.dim.white} {pos}/{len} ({percent}%) ⏱️  Elapsed: {elapsed_precise}  Remaining: {eta_precise}  Speed: {per_sec}/s&quot;)
+            .map_err(|e| DumpFsError::Unexpected(format!(&quot;Failed to create progress style: {}&quot;, e)))?
+    );
     progress.enable_steady_tick(std::time::Duration::from_millis(100));
     progress.set_prefix(&quot;📊 Setup&quot;);
 
@@ -2953,7 +2987,11 @@ fn main() -&gt; io::Result&lt;()&gt; {
         // Check if output file is a relative path with no directory component
         let output_path = PathBuf::from(&amp;args.output_file);
         if !output_path.is_absolute()
-            &amp;&amp; (output_path.parent().is_none() || output_path.parent().unwrap() == Path::new(&quot;&quot;))
+            &amp;&amp; (output_path.parent().is_none()
+                || output_path
+                    .parent()
+                    .expect(&quot;Parent should be Some if not None&quot;)
+                    == Path::new(&quot;&quot;))
         {
             // Use the repository directory for the output file
             config.output_file = repo.cache_path.join(output_path);
@@ -3020,7 +3058,7 @@ fn main() -&gt; io::Result&lt;()&gt; {
     progress.finish_and_clear();
 
     // Get scanner statistics
-    let scanner_stats = scanner.get_statistics();
+    let scanner_stats = scanner.get_statistics()?;
 
     // Prepare the scan report
     let scan_report = ScanReport {
@@ -3038,6 +3076,23 @@ fn main() -&gt; io::Result&lt;()&gt; {
     // Create a reporter and print the report
     let reporter = Reporter::new(ReportFormat::ConsoleTable);
     reporter.print_report(&amp;scan_report);
+
+    // Handle clipboard functionality if --clip is specified
+    if config.clip {
+        // Get the output file content
+        let output_content = std::fs::read_to_string(&amp;config.output_file)?;
+
+        // Copy to clipboard
+        match clipboard::copy_to_clipboard(&amp;output_content) {
+            Ok(_) =&gt; {
+                eprintln!(&quot;✅ Output copied to clipboard successfully&quot;);
+            }
+            Err(e) =&gt; {
+                eprintln!(&quot;❌ Failed to copy to clipboard: {}&quot;, e);
+                // Don&apos;t return error as the main functionality (file generation) succeeded
+            }
+        }
+    }
 
     Ok(())
 }
@@ -3354,8 +3409,8 @@ impl Reporter {
           </file>
           <file name="tests.rs" path="/home/user/projs/dumpfs/src/tests.rs">
             <metadata>
-              <size>12914</size>
-              <modified>2025-03-27T22:09:19.438647039+03:00</modified>
+              <size>13174</size>
+              <modified>2025-03-27T23:46:52.760326443+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -3472,6 +3527,7 @@ fn test_basic_scan() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        clip: false,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -3519,6 +3575,7 @@ fn test_ignore_patterns() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        clip: false,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -3560,6 +3617,7 @@ fn test_include_patterns() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        clip: false,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -3601,6 +3659,7 @@ fn test_large_file_handling() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        clip: false,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -3638,6 +3697,7 @@ fn test_xml_validity() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        clip: false,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -3689,6 +3749,7 @@ fn test_respect_gitignore() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        clip: false,
     };
 
     let progress = Arc::new(ProgressBar::hidden());
@@ -3749,6 +3810,7 @@ fn test_output_file_path_for_git_repo() {
             repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
             git_repo: Some(git_repo.clone()),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            clip: false,
         };
 
         // Apply output file path logic (simplified from main.rs)
@@ -3756,7 +3818,10 @@ fn test_output_file_path_for_git_repo() {
             let output_path = PathBuf::from(input);
             if !output_path.is_absolute()
                 &amp;&amp; (output_path.parent().is_none()
-                    || output_path.parent().unwrap() == Path::new(&quot;&quot;))
+                    || output_path
+                        .parent()
+                        .expect(&quot;Parent should be Some if not None&quot;)
+                        == Path::new(&quot;&quot;))
             {
                 config.output_file = repo.cache_path.join(output_path);
             }
@@ -3770,8 +3835,8 @@ fn test_output_file_path_for_git_repo() {
           </file>
           <file name="scanner.rs" path="/home/user/projs/dumpfs/src/scanner.rs">
             <metadata>
-              <size>26175</size>
-              <modified>2025-03-27T22:41:08.156489598+03:00</modified>
+              <size>30024</size>
+              <modified>2025-03-27T23:39:42.960516146+03:00</modified>
               <permissions>644</permissions>
             </metadata>
             <content>/*!
@@ -3780,7 +3845,7 @@ fn test_output_file_path_for_git_repo() {
 
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{self, BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -3792,6 +3857,7 @@ use rayon::prelude::*;
 use walkdir::{DirEntry, WalkDir};
 
 use crate::config::Config;
+use crate::error::{DumpFsError, Result, ResultExt};
 use crate::types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
 use crate::utils::{format_file_size, DEFAULT_IGNORE};
 
@@ -3904,8 +3970,14 @@ impl Scanner {
     }
 
     /// Get scanner statistics
-    pub fn get_statistics(&amp;self) -&gt; ScannerStatistics {
-        let mut stats = self.statistics.lock().unwrap().clone();
+    pub fn get_statistics(&amp;self) -&gt; Result&lt;ScannerStatistics&gt; {
+        let mut stats = self
+            .statistics
+            .lock()
+            .map_err(|_| {
+                DumpFsError::Unexpected(&quot;Failed to acquire lock on statistics&quot;.to_string())
+            })?
+            .clone();
 
         // If we have a tokenizer, get cache stats from global counters
         if self.tokenizer.is_some() {
@@ -3914,12 +3986,17 @@ impl Scanner {
             stats.token_cache_misses = Some(cache_stats.misses);
         }
 
-        stats
+        Ok(stats)
     }
 
     /// Scan the target directory and return the directory tree
-    pub fn scan(&amp;self) -&gt; io::Result&lt;DirectoryNode&gt; {
-        let abs_path = fs::canonicalize(&amp;self.config.target_dir)?;
+    pub fn scan(&amp;self) -&gt; Result&lt;DirectoryNode&gt; {
+        let abs_path = fs::canonicalize(&amp;self.config.target_dir).with_context(|| {
+            format!(
+                &quot;Failed to canonicalize path: {}&quot;,
+                self.config.target_dir.display()
+            )
+        })?;
 
         // Determine the base directory name and path
         let dir_name = if let Some(repo_info) = &amp;self.config.git_repo {
@@ -3929,7 +4006,12 @@ impl Scanner {
             // For local directories, use the directory name
             abs_path
                 .file_name()
-                .unwrap_or_default()
+                .ok_or_else(|| {
+                    DumpFsError::PathNotFound(format!(
+                        &quot;No file name in path: {}&quot;,
+                        abs_path.display()
+                    ))
+                })?
                 .to_string_lossy()
                 .to_string()
         };
@@ -3941,8 +4023,13 @@ impl Scanner {
     }
 
     /// Scan a directory and return its node representation
-    fn scan_directory(&amp;self, abs_path: &amp;Path, rel_path: &amp;Path) -&gt; io::Result&lt;DirectoryNode&gt; {
-        let metadata = self.get_metadata(abs_path)?;
+    fn scan_directory(&amp;self, abs_path: &amp;Path, rel_path: &amp;Path) -&gt; Result&lt;DirectoryNode&gt; {
+        let metadata = self.get_metadata(abs_path).with_context(|| {
+            format!(
+                &quot;Failed to get metadata for directory: {}&quot;,
+                abs_path.display()
+            )
+        })?;
         let mut contents = Vec::new();
 
         // Determine which entries to process based on whether we&apos;re using gitignore
@@ -3959,7 +4046,7 @@ impl Scanner {
             // Get all entries using the ignore walker
             let entries: Vec&lt;IgnoreDirEntry&gt; = walker
                 .build()
-                .filter_map(Result::ok)
+                .filter_map(|entry_result| entry_result.ok()) // Use closure instead of Result::ok to resolve type issues
                 .filter(|e| e.path() != abs_path) // Skip the root directory itself
                 .filter(|e| !self.should_ignore(e.path()))
                 .filter(|e| self.should_include(e.path()))
@@ -3981,7 +4068,12 @@ impl Scanner {
                     // Otherwise, just join with the entry name
                     let entry_name = entry_path
                         .file_name()
-                        .unwrap_or_default()
+                        .ok_or_else(|| {
+                            DumpFsError::PathNotFound(format!(
+                                &quot;No file name in path: {}&quot;,
+                                entry_path.display()
+                            ))
+                        })?
                         .to_string_lossy()
                         .to_string();
                     rel_path.join(&amp;entry_name)
@@ -3998,13 +4090,15 @@ impl Scanner {
             // Process files in parallel
             let file_nodes: Vec&lt;Node&gt; = files
                 .par_iter()
-                .filter_map(|entry| {
+                .filter_map(|entry: &amp;IgnoreDirEntry| {
                     let entry_path = entry.path();
-                    let entry_name = entry_path
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string();
+                    let entry_name = match entry_path.file_name() {
+                        Some(name) =&gt; name.to_string_lossy().to_string(),
+                        None =&gt; {
+                            eprintln!(&quot;Error: No file name in path: {}&quot;, entry_path.display());
+                            return None;
+                        }
+                    };
                     let new_rel_path = rel_path.join(&amp;entry_name);
 
                     match self.process_file(entry_path, &amp;new_rel_path) {
@@ -4024,7 +4118,7 @@ impl Scanner {
                 .max_depth(1)
                 .min_depth(1)
                 .into_iter()
-                .filter_map(Result::ok)
+                .filter_map(|entry_result| entry_result.ok()) // Use closure instead of Result::ok to resolve type issues
                 .filter(|e| !self.should_ignore(e.path()))
                 .filter(|e| self.should_include(e.path()))
                 .collect();
@@ -4051,7 +4145,7 @@ impl Scanner {
             // Process files in parallel
             let file_nodes: Vec&lt;Node&gt; = files
                 .par_iter()
-                .filter_map(|entry| {
+                .filter_map(|entry: &amp;DirEntry| {
                     let entry_name = entry.file_name().to_string_lossy().to_string();
                     let new_rel_path = rel_path.join(&amp;entry_name);
 
@@ -4068,12 +4162,16 @@ impl Scanner {
             contents.extend(file_nodes);
         }
 
+        let name = abs_path
+            .file_name()
+            .ok_or_else(|| {
+                DumpFsError::PathNotFound(format!(&quot;No file name in path: {}&quot;, abs_path.display()))
+            })?
+            .to_string_lossy()
+            .to_string();
+
         Ok(DirectoryNode {
-            name: abs_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string(),
+            name,
             path: rel_path.to_path_buf(),
             metadata,
             contents,
@@ -4081,13 +4179,15 @@ impl Scanner {
     }
 
     /// Process a single file and return its node representation
-    fn process_file(&amp;self, abs_path: &amp;Path, rel_path: &amp;Path) -&gt; io::Result&lt;Node&gt; {
+    fn process_file(&amp;self, abs_path: &amp;Path, rel_path: &amp;Path) -&gt; Result&lt;Node&gt; {
         self.progress.inc(1);
 
         // Update progress message to show current file
         let file_name = abs_path
             .file_name()
-            .unwrap_or_default()
+            .ok_or_else(|| {
+                DumpFsError::PathNotFound(format!(&quot;No file name in path: {}&quot;, abs_path.display()))
+            })?
             .to_string_lossy()
             .to_string();
 
@@ -4111,8 +4211,12 @@ impl Scanner {
 
         self.progress.set_message(progress_message);
 
-        let file_type = self.get_file_type(abs_path)?;
-        let metadata = self.get_metadata(abs_path)?;
+        let file_type = self
+            .get_file_type(abs_path)
+            .with_context(|| format!(&quot;Failed to determine file type for {}&quot;, abs_path.display()))?;
+        let metadata = self
+            .get_metadata(abs_path)
+            .with_context(|| format!(&quot;Failed to get metadata for {}&quot;, abs_path.display()))?;
 
         // Use the normalized path for reporting
         let file_path = if let Some(repo_info) = &amp;self.config.git_repo {
@@ -4130,7 +4234,9 @@ impl Scanner {
 
         match file_type {
             FileType::TextFile =&gt; {
-                let content = self.read_file_content(abs_path)?;
+                let content = self
+                    .read_file_content(abs_path)
+                    .with_context(|| format!(&quot;Failed to read content of {}&quot;, abs_path.display()))?;
                 Ok(Node::File(FileNode {
                     name: file_name,
                     path: rel_path.to_path_buf(),
@@ -4141,7 +4247,9 @@ impl Scanner {
             FileType::BinaryFile =&gt; {
                 // Update statistics for binary files
                 {
-                    let mut stats = self.statistics.lock().unwrap();
+                    let mut stats = self.statistics.lock().map_err(|_| {
+                        DumpFsError::Unexpected(&quot;Failed to acquire lock on statistics&quot;.to_string())
+                    })?;
                     stats.files_processed += 1;
                     stats.file_details.insert(
                         file_path,
@@ -4160,11 +4268,18 @@ impl Scanner {
                 }))
             }
             FileType::Symlink =&gt; {
-                let target = fs::read_link(abs_path)?.to_string_lossy().to_string();
+                let target = fs::read_link(abs_path)
+                    .with_context(|| {
+                        format!(&quot;Failed to read symlink target for {}&quot;, abs_path.display())
+                    })?
+                    .to_string_lossy()
+                    .to_string();
 
                 // Update statistics for symlinks
                 {
-                    let mut stats = self.statistics.lock().unwrap();
+                    let mut stats = self.statistics.lock().map_err(|_| {
+                        DumpFsError::Unexpected(&quot;Failed to acquire lock on statistics&quot;.to_string())
+                    })?;
                     stats.files_processed += 1;
                     stats.file_details.insert(
                         file_path,
@@ -4183,16 +4298,19 @@ impl Scanner {
                     target,
                 }))
             }
-            _ =&gt; Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!(&quot;Unexpected file type for {}&quot;, abs_path.display()),
-            )),
+            _ =&gt; Err(DumpFsError::Unexpected(format!(
+                &quot;Unexpected file type for {}&quot;,
+                abs_path.display()
+            ))),
         }
     }
 
     /// Check if a file should be ignored based on patterns and defaults
     pub fn should_ignore(&amp;self, path: &amp;Path) -&gt; bool {
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+        let file_name = match path.file_name() {
+            Some(name) =&gt; name.to_string_lossy(),
+            None =&gt; return true, // If there&apos;s no filename, ignore it
+        };
 
         // Check custom ignore patterns
         for pattern in &amp;self.config.ignore_patterns {
@@ -4221,7 +4339,10 @@ impl Scanner {
             return true;
         }
 
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+        let file_name = match path.file_name() {
+            Some(name) =&gt; name.to_string_lossy(),
+            None =&gt; return false, // If there&apos;s no filename, don&apos;t include it
+        };
 
         // Check against include patterns
         for pattern in &amp;self.config.include_patterns {
@@ -4234,8 +4355,13 @@ impl Scanner {
     }
 
     /// Determine the type of a file
-    fn get_file_type(&amp;self, path: &amp;Path) -&gt; io::Result&lt;FileType&gt; {
-        let metadata = fs::metadata(path)?;
+    fn get_file_type(&amp;self, path: &amp;Path) -&gt; Result&lt;FileType&gt; {
+        let metadata = fs::metadata(path).with_context(|| {
+            format!(
+                &quot;Failed to get metadata for file type detection: {}&quot;,
+                path.display()
+            )
+        })?;
 
         if metadata.is_dir() {
             return Ok(FileType::Directory);
@@ -4251,8 +4377,15 @@ impl Scanner {
                 // Read a sample of the file to determine type
                 let mut buffer = vec![0; std::cmp::min(8192, metadata.len() as usize)];
                 if !buffer.is_empty() {
-                    let mut file = File::open(path)?;
-                    let bytes_read = file.read(&amp;mut buffer)?;
+                    let mut file = File::open(path).with_context(|| {
+                        format!(&quot;Failed to open file for type detection: {}&quot;, path.display())
+                    })?;
+                    let bytes_read = file.read(&amp;mut buffer).with_context(|| {
+                        format!(
+                            &quot;Failed to read from file for type detection: {}&quot;,
+                            path.display()
+                        )
+                    })?;
                     buffer.truncate(bytes_read);
 
                     // Simple heuristic for text files: check for valid UTF-8 and high text-to-binary ratio
@@ -4279,19 +4412,29 @@ impl Scanner {
     }
 
     /// Extract metadata from a file
-    fn get_metadata(&amp;self, path: &amp;Path) -&gt; io::Result&lt;Metadata&gt; {
-        let fs_metadata = fs::metadata(path)?;
+    fn get_metadata(&amp;self, path: &amp;Path) -&gt; Result&lt;Metadata&gt; {
+        let fs_metadata = fs::metadata(path)
+            .with_context(|| format!(&quot;Failed to get file metadata for {}&quot;, path.display()))?;
+
+        let modified = fs_metadata
+            .modified()
+            .with_context(|| format!(&quot;Failed to get modified time for {}&quot;, path.display()))?;
 
         Ok(Metadata {
             size: fs_metadata.len(),
-            modified: fs_metadata.modified()?,
+            modified,
             permissions: format!(&quot;{:o}&quot;, fs_metadata.permissions().mode() &amp; 0o777),
         })
     }
 
     /// Read the content of a text file and update statistics
-    fn read_file_content(&amp;self, path: &amp;Path) -&gt; io::Result&lt;Option&lt;String&gt;&gt; {
-        let metadata = fs::metadata(path)?;
+    fn read_file_content(&amp;self, path: &amp;Path) -&gt; Result&lt;Option&lt;String&gt;&gt; {
+        let metadata = fs::metadata(path).with_context(|| {
+            format!(
+                &quot;Failed to get metadata for file content: {}&quot;,
+                path.display()
+            )
+        })?;
         // Get the normalized path for reporting
         let file_path = self.get_normalized_path_for_reporting(path);
 
@@ -4305,7 +4448,9 @@ impl Scanner {
 
             // Still update statistics for skipped files
             {
-                let mut stats = self.statistics.lock().unwrap();
+                let mut stats = self.statistics.lock().map_err(|_| {
+                    DumpFsError::Unexpected(&quot;Failed to acquire lock on statistics&quot;.to_string())
+                })?;
                 stats.files_processed += 1;
                 stats.file_details.insert(
                     file_path,
@@ -4342,9 +4487,12 @@ impl Scanner {
                 }
 
                 // Re-read file for content
-                let mut file = File::open(path)?;
-                if let Err(e) = file.read_to_string(&amp;mut content) {
-                    return Ok(Some(format!(&quot;Failed to read file content: {}&quot;, e)));
+                let mut file = File::open(path).with_context(|| {
+                    format!(&quot;Failed to re-open file for content: {}&quot;, path.display())
+                })?;
+                match file.read_to_string(&amp;mut content) {
+                    Ok(_) =&gt; {}
+                    Err(e) =&gt; return Ok(Some(format!(&quot;Failed to read file content: {}&quot;, e))),
                 }
 
                 // Count tokens if tokenizer is enabled
@@ -4362,7 +4510,9 @@ impl Scanner {
 
                 // Update statistics
                 {
-                    let mut stats = self.statistics.lock().unwrap();
+                    let mut stats = self.statistics.lock().map_err(|_| {
+                        DumpFsError::Unexpected(&quot;Failed to acquire lock on statistics&quot;.to_string())
+                    })?;
                     stats.files_processed += 1;
                     stats.total_lines += line_count;
                     stats.total_chars += char_count;
@@ -4426,6 +4576,7 @@ mod tests {
             repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
             git_repo: Some(git_repo),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            clip: false,
         };
 
         let scanner = Scanner::new(config, Arc::new(ProgressBar::hidden()));
@@ -4476,6 +4627,7 @@ mod tests {
             repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
             git_repo: Some(git_repo),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            clip: false,
         };
 
         let scanner = Scanner::new(config, Arc::new(ProgressBar::hidden()));
@@ -4496,6 +4648,766 @@ mod tests {
         let other_path = PathBuf::from(&quot;/other/path/file.txt&quot;);
         let other_display = scanner.get_normalized_path_for_reporting(&amp;other_path);
         assert_eq!(other_display, &quot;/other/path/file.txt&quot;);
+    }
+}
+</content>
+          </file>
+          <file name="error.rs" path="/home/user/projs/dumpfs/src/error.rs">
+            <metadata>
+              <size>3030</size>
+              <modified>2025-03-27T23:26:19.607470211+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>//! Global error handling for dumpfs
+//!
+//! This module provides a centralized error type that can represent errors
+//! from all modules in the project.
+
+use std::io;
+use thiserror::Error;
+
+use crate::git::GitError;
+use crate::tokenizer::TokenizerError;
+
+/// Global error type for dumpfs operations
+#[derive(Error, Debug)]
+pub enum DumpFsError {
+    /// Git-related errors
+    #[error(&quot;Git error: {0}&quot;)]
+    Git(#[from] GitError),
+
+    /// Tokenizer-related errors
+    #[error(&quot;Tokenizer error: {0}&quot;)]
+    Tokenizer(#[from] TokenizerError),
+
+    /// File system errors
+    #[error(&quot;IO error: {0}&quot;)]
+    Io(#[from] io::Error),
+
+    /// Configuration errors
+    #[error(&quot;Configuration error: {0}&quot;)]
+    Config(String),
+
+    /// XML processing errors
+    #[error(&quot;XML error: {0}&quot;)]
+    Xml(#[from] quick_xml::Error),
+
+    /// JSON processing errors
+    #[error(&quot;JSON error: {0}&quot;)]
+    Json(#[from] serde_json::Error),
+
+    /// Regular expression errors
+    #[error(&quot;Regex error: {0}&quot;)]
+    Regex(#[from] regex::Error),
+
+    /// Scanner errors
+    #[error(&quot;Scanner error: {0}&quot;)]
+    Scanner(String),
+
+    /// Writer errors
+    #[error(&quot;Writer error: {0}&quot;)]
+    Writer(String),
+
+    /// Path not found
+    #[error(&quot;Path not found: {0}&quot;)]
+    PathNotFound(String),
+
+    /// Invalid argument
+    #[error(&quot;Invalid argument: {0}&quot;)]
+    InvalidArgument(String),
+
+    /// Unexpected error
+    #[error(&quot;Unexpected error: {0}&quot;)]
+    Unexpected(String),
+}
+
+/// Specialized Result type for dumpfs operations
+pub type Result&lt;T&gt; = std::result::Result&lt;T, DumpFsError&gt;;
+
+/// Creates a DumpFsError with a formatted message
+#[macro_export]
+macro_rules! error {
+    ($error_type:ident, $($arg:tt)*) =&gt; {
+        $crate::error::DumpFsError::$error_type(format!($($arg)*))
+    };
+}
+
+/// Returns an error result with a formatted message
+#[macro_export]
+macro_rules! bail {
+    ($error_type:ident, $($arg:tt)*) =&gt; {
+        return Err($crate::error!($error_type, $($arg)*))
+    };
+}
+
+/// Ensures a condition is true, otherwise returns an error
+#[macro_export]
+macro_rules! ensure {
+    ($cond:expr, $error_type:ident, $($arg:tt)*) =&gt; {
+        if !($cond) {
+            $crate::bail!($error_type, $($arg)*)
+        }
+    };
+}
+
+/// Extension trait for adding context to errors
+pub trait ResultExt&lt;T, E&gt; {
+    /// Add additional context to an error
+    fn with_context&lt;C, F&gt;(self, f: F) -&gt; Result&lt;T&gt;
+    where
+        F: FnOnce() -&gt; C,
+        C: std::fmt::Display;
+}
+
+impl&lt;T, E: std::error::Error + &apos;static&gt; ResultExt&lt;T, E&gt; for std::result::Result&lt;T, E&gt; {
+    fn with_context&lt;C, F&gt;(self, f: F) -&gt; Result&lt;T&gt;
+    where
+        F: FnOnce() -&gt; C,
+        C: std::fmt::Display,
+    {
+        self.map_err(|e| {
+            let context = f();
+            DumpFsError::Unexpected(format!(&quot;{}: {}&quot;, context, e))
+        })
+    }
+}
+
+// Allow converting DumpFsError to io::Error for backward compatibility with tests
+impl From&lt;DumpFsError&gt; for io::Error {
+    fn from(err: DumpFsError) -&gt; Self {
+        io::Error::new(io::ErrorKind::Other, err.to_string())
+    }
+}
+</content>
+          </file>
+          <file name="clipboard.rs" path="/home/user/projs/dumpfs/src/clipboard.rs">
+            <metadata>
+              <size>16570</size>
+              <modified>2025-03-28T00:13:24.410051240+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Clipboard support for DumpFS
+ *
+ * Provides functionality for copying output to system clipboard
+ * with automatic detection of available clipboard mechanisms.
+ */
+
+use std::env;
+use std::io::{self, Write};
+use std::path::Path;
+use std::process::{Command, Stdio};
+use std::sync::OnceLock;
+
+use thiserror::Error;
+
+// Constants for version checking
+const TMUX_MIN_VERSION_WITH_W_FLAG: (u32, u32, u32) = (3, 2, 0);
+
+/// Error type for clipboard operations
+#[derive(Error, Debug)]
+pub enum ClipboardError {
+    /// The command is not available on the system
+    #[error(&quot;Command not found: {0}&quot;)]
+    CommandNotFound(String),
+
+    /// Failed to execute the command
+    #[error(&quot;Command failed: {0}&quot;)]
+    CommandFailed(String),
+
+    /// No suitable clipboard mechanism was found
+    #[error(&quot;No suitable clipboard mechanism found&quot;)]
+    NoClipboardFound,
+
+    /// IO error
+    #[error(&quot;IO error: {0}&quot;)]
+    Io(#[from] io::Error),
+}
+
+/// Result type for clipboard operations
+pub type Result&lt;T&gt; = std::result::Result&lt;T, ClipboardError&gt;;
+
+/// Trait for clipboard operations
+pub trait Clipboard {
+    /// Copy text to the clipboard
+    fn copy_to_clipboard(&amp;self, text: &amp;str) -&gt; Result&lt;()&gt;;
+}
+
+/// Available clipboard providers
+#[derive(Debug, Clone, Copy)]
+enum ClipboardProvider {
+    /// tmux clipboard
+    Tmux,
+    /// X11 clipboard with xclip
+    Xclip,
+    /// X11 clipboard with xsel
+    Xsel,
+    /// Wayland clipboard
+    Wayland,
+    /// macOS clipboard
+    MacOS,
+    /// Windows clipboard (via WSL)
+    Wsl,
+    /// Termux clipboard
+    Termux,
+}
+
+impl Clipboard for ClipboardProvider {
+    fn copy_to_clipboard(&amp;self, text: &amp;str) -&gt; Result&lt;()&gt; {
+        let (cmd, args) = match self {
+            Self::Tmux =&gt; {
+                // Check tmux version to determine if we should use the -w flag
+                let tmux_args = vec![&quot;load-buffer&quot;, &quot;-w&quot;, &quot;-&quot;];
+                (&quot;tmux&quot;, tmux_args)
+            }
+            Self::Xclip =&gt; (&quot;xclip&quot;, vec![&quot;-selection&quot;, &quot;clipboard&quot;, &quot;-in&quot;]),
+            Self::Xsel =&gt; (&quot;xsel&quot;, vec![&quot;-b&quot;, &quot;-i&quot;]),
+            Self::Wayland =&gt; (&quot;wl-copy&quot;, vec![]),
+            Self::MacOS =&gt; (&quot;pbcopy&quot;, vec![]),
+            Self::Wsl =&gt; (&quot;clip.exe&quot;, vec![]),
+            Self::Termux =&gt; (&quot;termux-clipboard-set&quot;, vec![]),
+        };
+
+        execute_clipboard_command(cmd, &amp;args, text)
+    }
+}
+
+//--------------------------------------------------------------------
+// Public API
+//--------------------------------------------------------------------
+
+/// Copy text to the clipboard
+///
+/// Automatically detects the most appropriate clipboard mechanism
+/// and uses it to copy text to the system clipboard.
+///
+/// # Arguments
+/// * `text` - The text to copy to the clipboard
+///
+/// # Returns
+/// * `Ok(())` - If the text was successfully copied
+/// * `Err(ClipboardError)` - If the text could not be copied
+///
+/// # Examples
+/// ```
+/// use dumpfs::clipboard::copy_to_clipboard;
+///
+/// let result = copy_to_clipboard(&quot;Hello, clipboard!&quot;);
+/// if let Err(e) = result {
+///     eprintln!(&quot;Failed to copy to clipboard: {}&quot;, e);
+/// }
+/// ```
+pub fn copy_to_clipboard(text: &amp;str) -&gt; Result&lt;()&gt; {
+    let clipboard = get_clipboard()?;
+    clipboard.copy_to_clipboard(text)
+}
+
+/// Check if a command exists on the system
+///
+/// # Arguments
+/// * `command` - The command to check
+///
+/// # Returns
+/// * `true` - If the command exists and can be executed
+/// * `false` - Otherwise
+pub fn command_exists(command: &amp;str) -&gt; bool {
+    // First check if the command exists in the PATH
+    if let Ok(paths) = env::var(&quot;PATH&quot;) {
+        for path in paths.split(&apos;:&apos;) {
+            let p = Path::new(path).join(command);
+            if p.exists() {
+                return true;
+            }
+        }
+    }
+
+    // Try to run the command with &apos;--version&apos; flag as fallback
+    Command::new(command)
+        .arg(&quot;--version&quot;)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok()
+}
+
+//--------------------------------------------------------------------
+// Internal Implementation
+//--------------------------------------------------------------------
+
+/// Get the appropriate clipboard implementation based on the system
+fn get_clipboard() -&gt; Result&lt;Box&lt;dyn Clipboard&gt;&gt; {
+    // Define a list of providers to try in order of preference
+    let providers = determine_clipboard_providers();
+
+    // Try each provider in order
+    for provider in providers {
+        if let Some(clipboard) = try_clipboard_provider(provider) {
+            return Ok(clipboard);
+        }
+    }
+
+    // No clipboard mechanism found
+    Err(ClipboardError::NoClipboardFound)
+}
+
+/// Execute a command to copy text to clipboard
+///
+/// This centralizes all the common command execution logic:
+/// - Spawning the process
+/// - Writing to stdin
+/// - Waiting for completion
+/// - Error handling
+fn execute_clipboard_command(cmd: &amp;str, args: &amp;[&amp;str], text: &amp;str) -&gt; Result&lt;()&gt; {
+    let mut child = Command::new(cmd)
+        .args(args)
+        .stdin(Stdio::piped())
+        .spawn()
+        .map_err(|_| ClipboardError::CommandFailed(format!(&quot;Failed to spawn {}&quot;, cmd)))?;
+
+    let stdin = child.stdin.as_mut().ok_or_else(|| {
+        ClipboardError::CommandFailed(format!(&quot;Failed to open stdin for {}&quot;, cmd))
+    })?;
+
+    stdin
+        .write_all(text.as_bytes())
+        .map_err(|_| ClipboardError::CommandFailed(format!(&quot;Failed to write to {}&quot;, cmd)))?;
+
+    let status = child
+        .wait()
+        .map_err(|_| ClipboardError::CommandFailed(format!(&quot;Failed to wait for {}&quot;, cmd)))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(ClipboardError::CommandFailed(format!(
+            &quot;{} exited with status: {}&quot;,
+            cmd, status
+        )))
+    }
+}
+
+/// Platform detection cache (using thread-safe lazy initialization)
+static PLATFORM: OnceLock&lt;&amp;&apos;static str&gt; = OnceLock::new();
+
+/// Determine the platform (cached)
+fn get_platform() -&gt; &amp;&apos;static str {
+    PLATFORM.get_or_init(|| {
+        if cfg!(target_os = &quot;macos&quot;) {
+            &quot;macos&quot;
+        } else if cfg!(target_os = &quot;windows&quot;) {
+            &quot;windows&quot;
+        } else if cfg!(target_os = &quot;linux&quot;) {
+            if env::var(&quot;WSL_DISTRO_NAME&quot;).is_ok() {
+                &quot;wsl&quot;
+            } else {
+                &quot;linux&quot;
+            }
+        } else if cfg!(target_os = &quot;android&quot;) {
+            &quot;android&quot;
+        } else {
+            &quot;unknown&quot;
+        }
+    })
+}
+
+/// Determine which clipboard providers to try based on platform and preference
+fn determine_clipboard_providers() -&gt; Vec&lt;ClipboardProvider&gt; {
+    let mut providers = Vec::with_capacity(3); // Pre-allocate space for typical number of providers
+
+    // Always try tmux first if available and running (user preference)
+    if command_exists(&quot;tmux&quot;) &amp;&amp; is_tmux_running() {
+        providers.push(ClipboardProvider::Tmux);
+    }
+
+    // Add platform-specific providers
+    match get_platform() {
+        &quot;macos&quot; =&gt; {
+            if command_exists(&quot;pbcopy&quot;) {
+                providers.push(ClipboardProvider::MacOS);
+            }
+        }
+        &quot;windows&quot; | &quot;wsl&quot; =&gt; {
+            if command_exists(&quot;clip.exe&quot;) {
+                providers.push(ClipboardProvider::Wsl);
+            }
+        }
+        &quot;linux&quot; =&gt; {
+            // Try Wayland first
+            if command_exists(&quot;wl-copy&quot;) {
+                providers.push(ClipboardProvider::Wayland);
+            }
+
+            // Then X11 mechanisms
+            if command_exists(&quot;xsel&quot;) {
+                providers.push(ClipboardProvider::Xsel);
+            }
+
+            if command_exists(&quot;xclip&quot;) {
+                providers.push(ClipboardProvider::Xclip);
+            }
+        }
+        &quot;android&quot; =&gt; {
+            if command_exists(&quot;termux-clipboard-set&quot;) {
+                providers.push(ClipboardProvider::Termux);
+            }
+        }
+        _ =&gt; {}
+    }
+
+    providers
+}
+
+/// Try to create a clipboard provider
+fn try_clipboard_provider(provider: ClipboardProvider) -&gt; Option&lt;Box&lt;dyn Clipboard&gt;&gt; {
+    Some(Box::new(provider))
+}
+
+/// Check if tmux is running and available for clipboard operations
+fn is_tmux_running() -&gt; bool {
+    // Check if TMUX environment variable is set (inside tmux session)
+    if env::var(&quot;TMUX&quot;).is_ok() {
+        return true;
+    }
+
+    // Try running tmux list-buffers as a fallback check
+    let status = Command::new(&quot;tmux&quot;)
+        .args([&quot;list-buffers&quot;])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+
+    // If the command succeeds, tmux is running and can be used
+    status.map(|s| s.success()).unwrap_or(false)
+}
+
+//--------------------------------------------------------------------
+// Tmux Version Handling
+//--------------------------------------------------------------------
+
+/// Cache for tmux version check result
+static TMUX_VERSION_W_FLAG: OnceLock&lt;bool&gt; = OnceLock::new();
+
+/// Determine if we should use the `-w` flag for tmux load-buffer command
+/// This flag is needed for tmux 3.2.0 and newer versions to properly integrate with system clipboard
+///
+/// Result is cached after first call for performance.
+fn should_use_tmux_w_flag() -&gt; Option&lt;bool&gt; {
+    // Return cached result if available
+    if let Some(result) = TMUX_VERSION_W_FLAG.get() {
+        return Some(*result);
+    }
+
+    // Calculate and cache the result
+    let result = compute_tmux_w_flag_requirement()?;
+    TMUX_VERSION_W_FLAG.set(result).ok()?;
+    Some(result)
+}
+
+/// Compute whether tmux `-w` flag should be used (internal helper)
+fn compute_tmux_w_flag_requirement() -&gt; Option&lt;bool&gt; {
+    // Run tmux -V to get version information
+    let output = Command::new(&quot;tmux&quot;).arg(&quot;-V&quot;).output().ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    // Parse the version string
+    let version_str = String::from_utf8_lossy(&amp;output.stdout);
+    let parsed_version = parse_tmux_version(&amp;version_str)?;
+
+    // The -w flag is supported in tmux 3.2.0 and later
+    Some(version_ge(parsed_version, TMUX_MIN_VERSION_WITH_W_FLAG))
+}
+
+/// Parse a tmux version string into a tuple of (major, minor, patch)
+fn parse_tmux_version(version_str: &amp;str) -&gt; Option&lt;(u32, u32, u32)&gt; {
+    // Common format: &quot;tmux 3.2a&quot; or &quot;tmux 3.2&quot; or &quot;tmux 3.2.1&quot;
+    let version_parts: Vec&lt;&amp;str&gt; = version_str.split_whitespace().collect();
+    if version_parts.len() &lt; 2 {
+        return None;
+    }
+
+    // Extract the version number part
+    let mut version_num = version_parts[1].to_string();
+
+    // Remove any alphabetical suffix (like &quot;a&quot; in &quot;3.2a&quot;)
+    version_num = version_num
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == &apos;.&apos;)
+        .collect();
+
+    // Split into components
+    let components: Vec&lt;&amp;str&gt; = version_num.split(&apos;.&apos;).collect();
+
+    // Parse major
+    let major = components.first().and_then(|v| v.parse::&lt;u32&gt;().ok())?;
+
+    // Parse minor (default to 0 if not present)
+    let minor = components
+        .get(1)
+        .and_then(|v| v.parse::&lt;u32&gt;().ok())
+        .unwrap_or(0);
+
+    // Parse patch (default to 0 if not present)
+    let patch = components
+        .get(2)
+        .and_then(|v| v.parse::&lt;u32&gt;().ok())
+        .unwrap_or(0);
+
+    Some((major, minor, patch))
+}
+
+/// Compare two version tuples
+fn version_ge(version: (u32, u32, u32), min_version: (u32, u32, u32)) -&gt; bool {
+    // Compare major, minor, and patch versions in sequence
+    match version.0.cmp(&amp;min_version.0) {
+        std::cmp::Ordering::Greater =&gt; true,
+        std::cmp::Ordering::Less =&gt; false,
+        std::cmp::Ordering::Equal =&gt; match version.1.cmp(&amp;min_version.1) {
+            std::cmp::Ordering::Greater =&gt; true,
+            std::cmp::Ordering::Less =&gt; false,
+            std::cmp::Ordering::Equal =&gt; version.2 &gt;= min_version.2,
+        },
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[test]
+    fn test_command_exists() {
+        // These commands should exist on most systems
+        assert!(command_exists(&quot;ls&quot;));
+        assert!(command_exists(&quot;echo&quot;));
+
+        // This command should not exist
+        assert!(!command_exists(&quot;nonexistentcommandxyz&quot;));
+    }
+
+    #[test]
+    fn test_get_platform() {
+        let platform = get_platform();
+
+        // Just check that it&apos;s one of the known platforms
+        assert!(
+            platform == &quot;macos&quot;
+                || platform == &quot;windows&quot;
+                || platform == &quot;wsl&quot;
+                || platform == &quot;linux&quot;
+                || platform == &quot;android&quot;
+                || platform == &quot;unknown&quot;
+        );
+
+        // Check that caching works (call again and verify it&apos;s the same result)
+        let platform2 = get_platform();
+        assert_eq!(platform, platform2);
+    }
+
+    #[test]
+    #[ignore] // This test requires tmux to be installed and running
+    fn test_tmux_clipboard() {
+        // Skip the test if tmux is not available
+        if !command_exists(&quot;tmux&quot;) {
+            return;
+        }
+
+        // Check if we&apos;re in a tmux session
+        let in_tmux = env::var(&quot;TMUX&quot;).is_ok();
+        if !in_tmux {
+            return;
+        }
+
+        let clipboard = ClipboardProvider::Tmux;
+        let test_text = &quot;Test text for tmux clipboard&quot;;
+
+        // Copy to clipboard
+        clipboard
+            .copy_to_clipboard(test_text)
+            .expect(&quot;Failed to copy to tmux clipboard&quot;);
+
+        // Verify by reading from clipboard
+        let output = Command::new(&quot;tmux&quot;)
+            .args([&quot;show-buffer&quot;])
+            .output()
+            .expect(&quot;Failed to execute tmux show-buffer&quot;);
+
+        let clipboard_content = String::from_utf8_lossy(&amp;output.stdout);
+        assert_eq!(clipboard_content.trim(), test_text);
+    }
+
+    #[test]
+    fn test_parse_tmux_version() {
+        // Test exact version formats
+        assert_eq!(parse_tmux_version(&quot;tmux 3.2&quot;), Some((3, 2, 0)));
+        assert_eq!(parse_tmux_version(&quot;tmux 3.2a&quot;), Some((3, 2, 0)));
+        assert_eq!(parse_tmux_version(&quot;tmux 3.2.1&quot;), Some((3, 2, 1)));
+        assert_eq!(parse_tmux_version(&quot;tmux 4.0&quot;), Some((4, 0, 0)));
+
+        // Test invalid formats
+        assert_eq!(parse_tmux_version(&quot;tmux&quot;), None);
+        assert_eq!(parse_tmux_version(&quot;not-tmux 3.2&quot;), Some((3, 2, 0))); // Should still work if second part is valid
+        assert_eq!(parse_tmux_version(&quot;&quot;), None);
+    }
+
+    #[test]
+    fn test_version_compare() {
+        // Greater major
+        assert!(version_ge((4, 0, 0), (3, 2, 0)));
+
+        // Equal major, greater minor
+        assert!(version_ge((3, 3, 0), (3, 2, 0)));
+
+        // Equal major and minor, greater patch
+        assert!(version_ge((3, 2, 1), (3, 2, 0)));
+
+        // Equal versions
+        assert!(version_ge((3, 2, 0), (3, 2, 0)));
+
+        // Less than cases
+        assert!(!version_ge((3, 1, 0), (3, 2, 0)));
+        assert!(!version_ge((2, 9, 0), (3, 2, 0)));
+        assert!(!version_ge((3, 2, 0), (3, 2, 1)));
+    }
+
+    #[test]
+    fn test_tmux_version_check() {
+        // Only run if tmux is available
+        if !command_exists(&quot;tmux&quot;) {
+            return;
+        }
+
+        // Call twice to test caching
+        let result1 = should_use_tmux_w_flag();
+        let result2 = should_use_tmux_w_flag();
+
+        // Results should be the same (from cache)
+        assert_eq!(result1, result2);
+
+        println!(&quot;Should use tmux -w flag: {:?}&quot;, result1);
+
+        // If we have a result, check that the version parsing worked
+        if let Some(use_w) = result1 {
+            // Get the raw version string
+            let output = Command::new(&quot;tmux&quot;)
+                .arg(&quot;-V&quot;)
+                .output()
+                .expect(&quot;Failed to get tmux version&quot;);
+
+            let version_str = String::from_utf8_lossy(&amp;output.stdout);
+            println!(&quot;Tmux version: {}&quot;, version_str);
+
+            // Parse the version
+            if let Some(version) = parse_tmux_version(&amp;version_str) {
+                println!(&quot;Parsed version: {:?}&quot;, version);
+
+                // Verify our result
+                let expected = version_ge(version, TMUX_MIN_VERSION_WITH_W_FLAG);
+                assert_eq!(use_w, expected, &quot;Version check mismatch&quot;);
+            }
+        }
+    }
+
+    #[test]
+    fn test_version_compare_performance() {
+        // Simple performance check - run many comparisons
+        let start = std::time::Instant::now();
+        for _ in 0..10000 {
+            assert!(version_ge((4, 2, 1), (3, 2, 0)));
+            assert!(!version_ge((2, 9, 9), (3, 0, 0)));
+        }
+        let duration = start.elapsed();
+
+        // Should complete quickly
+        println!(&quot;10000 version comparisons took: {:?}&quot;, duration);
+        assert!(duration.as_millis() &lt; 50, &quot;Version comparison is too slow&quot;);
+    }
+}
+</content>
+          </file>
+        </contents>
+      </directory>
+      <directory name="tests" path="/home/user/projs/dumpfs/tests">
+        <metadata>
+          <size>48</size>
+          <modified>2025-03-27T23:43:16.131549866+03:00</modified>
+          <permissions>755</permissions>
+        </metadata>
+        <contents>
+          <file name="clipboard_integration.rs" path="/home/user/projs/dumpfs/tests/clipboard_integration.rs">
+            <metadata>
+              <size>2268</size>
+              <modified>2025-03-28T00:05:47.661214722+03:00</modified>
+              <permissions>644</permissions>
+            </metadata>
+            <content>/*!
+ * Integration test for clipboard functionality
+ */
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::process::Command;
+
+    use tempfile::tempdir;
+
+    #[test]
+    #[ignore] // This test requires tmux to be running and is ignored by default
+              // To run this test manually use: cargo test --test clipboard_integration -- --ignored
+    fn test_clip_flag() {
+        // Skip if not in a tmux session
+        if env::var(&quot;TMUX&quot;).is_err() {
+            return;
+        }
+
+        // Create a temporary directory with some test files
+        let temp_dir = tempdir().unwrap();
+        let test_file = temp_dir.path().join(&quot;test.txt&quot;);
+        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+        // Write some content to the test file
+        let mut file = File::create(&amp;test_file).unwrap();
+        writeln!(file, &quot;Test content for clipboard integration&quot;).unwrap();
+
+        // Build the project first to ensure binary is available
+        assert!(Command::new(&quot;cargo&quot;)
+            .args([&quot;build&quot;])
+            .status()
+            .unwrap()
+            .success());
+
+        // Run dumpfs with --clip flag
+        // The command format is: dumpfs [OPTIONS] [DIRECTORY_PATH] [OUTPUT_FILE]
+        let status = Command::new(&quot;cargo&quot;)
+            .args([
+                &quot;run&quot;,
+                &quot;--&quot;,
+                &quot;--clip&quot;,
+                &amp;temp_dir.path().to_string_lossy(), // Directory path (positional)
+                &amp;output_file.to_string_lossy(),     // Output file (positional)
+            ])
+            .status()
+            .unwrap();
+
+        // Check that the command succeeded
+        assert!(status.success());
+
+        // Verify that the output file exists
+        assert!(output_file.exists());
+
+        // Get the content from the output file
+        let xml_content = fs::read_to_string(&amp;output_file).unwrap();
+
+        // Get the content from the tmux clipboard
+        let clipboard_output = Command::new(&quot;tmux&quot;).args([&quot;show-buffer&quot;]).output().unwrap();
+
+        let clipboard_content = String::from_utf8_lossy(&amp;clipboard_output.stdout);
+
+        // Verify that the clipboard contains the XML content
+        assert_eq!(xml_content, clipboard_content);
     }
 }
 </content>
@@ -4552,13 +5464,316 @@ panic = &quot;abort&quot;
 strip = true
 </content>
       </file>
-      <binary name="README.md" path="dumpfs/README.md">
+      <file name="README.md" path="dumpfs/README.md">
         <metadata>
-          <size>11675</size>
-          <modified>2025-03-27T19:14:34.304929991+03:00</modified>
+          <size>11813</size>
+          <modified>2025-03-27T23:44:05.762558304+03:00</modified>
           <permissions>644</permissions>
         </metadata>
-      </binary>
+        <content># DumpFS: Directory Context Generator for LLMs
+
+`dumpfs` is a command-line tool that generates an XML representation of directory contents, designed specifically for providing context to Large Language Models (LLMs) for coding tasks.
+
+## Features
+
+- Recursively scans directories and generates structured XML output
+- Includes file content with CDATA wrapping
+- Handles different file types (text, binary, symlinks)
+- Provides file metadata (size, modification time, permissions)
+- Supports pattern-based inclusion and exclusion of files
+- Respects `.gitignore` files for intelligent filtering
+- Supports Git repository URLs (GitHub, GitLab, Bitbucket, and more)
+- Automatically clones and manages repositories in a local cache
+- Parallel processing for better performance
+- Progress tracking with ETA and detailed file statistics
+- Beautiful Unicode progress display with real-time file information
+- Comprehensive summary of scanned content with LLM token estimation
+- Intelligent caching of tokenized files for faster processing
+
+## Installation
+
+### From Source
+
+```bash
+git clone https://github.com/kkharji/dumpfs.git
+cd dumpfs
+cargo build --release
+```
+
+The binary will be available at `target/release/dumpfs`.
+
+## Usage
+
+```
+dumpfs [DIRECTORY_PATH|GIT_URL] [OUTPUT_FILE] [OPTIONS]
+
+OPTIONS:
+    --ignore-patterns &lt;pattern1,pattern2,...&gt;    Comma-separated list of patterns to ignore
+    --include-patterns &lt;pattern1,pattern2,...&gt;   Comma-separated list of patterns to include
+    --threads &lt;N&gt;                                Number of threads to use for processing
+    --respect-gitignore &lt;BOOL&gt;                   Whether to respect .gitignore files (default: true)
+    --gitignore-path &lt;PATH&gt;                      Path to custom .gitignore file
+    --model &lt;MODEL&gt;                              LLM model to use for tokenization
+    --generate &lt;SHELL&gt;                           Generate shell completions (bash, zsh, fish, etc.)
+    --clean-cache &lt;DAYS&gt;                         Clean Git repository cache older than DAYS (0 for all)
+    --clip                                       Copy output to system clipboard
+```
+
+### Supported Models
+
+The `--model` option enables accurate token counting and caching. Supported models include:
+
+**OpenAI Models:**
+- `gpt-4` - GPT-4 (8K context window)
+- `gpt-4-turbo` - GPT-4 Turbo (128K context window)
+- `gpt4o` - GPT-4o (8K context window)
+
+**Anthropic Models:**
+- `sonnet-3.5` - Claude 3.5 Sonnet (200K context window)
+- `sonnet-3.7` - Claude 3.7 Sonnet (200K context window)
+
+**HuggingFace Models:**
+- `llama-2-7b` - Llama 2 7B (4K context window)
+- `llama-3-8b` - Llama 3 8B (8K context window)
+- `mistral-small` - Mistral Small (32K context window)
+- `mistral-small-24b` - Mistral Small 24B (128K context window)
+- `mistral-large` - Mistral Large (128K context window)
+- `pixtral-12b` - Pixtral 12B (128K context window)
+
+When a model is specified, `dumpfs` provides exact token counts instead of estimates and caches results for faster processing on subsequent runs.
+
+When running the command, you&apos;ll see a beautiful progress display showing:
+
+- Real-time progress with an animated spinner
+- Current file being processed
+- Progress bar showing completion percentage
+- Processing speed (files per second)
+- Estimated time remaining
+
+After completion, you&apos;ll get a comprehensive summary showing file statistics and token estimation for LLM usage.
+
+### Shell Completion
+
+dumpfs supports shell completion for Bash, Fish, Zsh, Elvish, and PowerShell. To generate completion scripts, use:
+
+```bash
+# For bash
+dumpfs --generate bash &gt; ~/.local/share/bash-completion/completions/dumpfs
+
+# For zsh
+dumpfs --generate zsh &gt; ~/.zfunc/_dumpfs
+
+# For fish
+dumpfs --generate fish &gt; ~/.config/fish/completions/dumpfs.fish
+
+# For PowerShell
+dumpfs --generate powershell &gt; _dumpfs.ps1
+```
+
+For Zsh, make sure to add `~/.zfunc` to your `fpath` in your `.zshrc`:
+
+```zsh
+fpath=( ~/.zfunc $fpath )
+```
+
+Shell completion provides auto-completion for commands, options, and even supported model types for the `--model` option.
+
+
+### Examples
+
+```bash
+# Process current directory
+dumpfs
+
+# Process specific directory with custom output file
+dumpfs /path/to/project project_context.xml
+
+# Process a GitHub repository
+dumpfs https://github.com/username/repo
+
+# Process a GitLab repository
+dumpfs https://gitlab.com/username/repo
+
+# Process a repository via SSH URL
+dumpfs git@github.com:username/repo.git
+
+# Ignore specific patterns
+dumpfs --ignore-patterns &quot;*.log,*.tmp,*.bak&quot;
+
+# Include only specific patterns
+dumpfs --include-patterns &quot;*.rs,*.toml,*.md&quot;
+
+# Use 8 threads for processing
+dumpfs --threads 8
+
+# Disable .gitignore respect
+dumpfs --respect-gitignore false
+
+# Use custom gitignore file
+dumpfs --gitignore-path /path/to/custom/gitignore
+
+# Use specific model for token counting with caching
+dumpfs --model gpt4o
+
+# Copy the output XML to system clipboard
+dumpfs --clip
+
+# Clean Git repository cache older than 30 days
+dumpfs --clean-cache 30
+
+# Clean all Git repository cache
+dumpfs --clean-cache 0
+```
+
+## Git Repository Support
+
+`dumpfs` supports generating context directly from Git repositories by specifying a repository URL. The tool will clone the repository to a local cache directory (`~/.cache/dumpfs/`) and process it like a local directory.
+
+### Supported Repository URL Formats
+
+- GitHub: `https://github.com/username/repo` or `git@github.com:username/repo.git`
+- GitLab: `https://gitlab.com/username/repo` or `git@gitlab.com:username/repo.git`
+- Bitbucket: `https://bitbucket.org/username/repo` or `git@bitbucket.org:username/repo.git`
+- Other Git hosts: Any valid HTTP/HTTPS or SSH Git URL
+
+### Repository Caching
+
+Repositories are stored in the following locations, organized by hosting platform:
+
+- GitHub: `~/.cache/dumpfs/github/username/repo`
+- GitLab: `~/.cache/dumpfs/gitlab/username/repo`
+- Bitbucket: `~/.cache/dumpfs/bitbucket/username/repo`
+- Other: `~/.cache/dumpfs/git/hostname/username/repo`
+
+When processing a repository that&apos;s already in the cache, `dumpfs` will automatically update it with the latest changes from the remote.
+
+You can clean up old cached repositories using the `--clean-cache` option followed by the age in days. For example, `--clean-cache 30` will remove repositories that haven&apos;t been accessed in the last 30 days. Using `--clean-cache 0` will clean all cached repositories.
+
+## GitIgnore Support
+
+By default, `dumpfs` respects `.gitignore` files in the project directory. This means that files and directories that would be ignored by Git are also ignored by `dumpfs`. This is useful for excluding build artifacts, dependencies, and other files that are not relevant to the codebase.
+
+You can disable this behavior with the `--respect-gitignore false` option, or specify a custom gitignore file with the `--gitignore-path` option.
+
+## Output Format
+
+The tool generates an XML file with the following structure:
+
+```xml
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;directory_scan timestamp=&quot;2025-03-26T12:34:56+00:00&quot;&gt;
+  &lt;system_info&gt;
+    &lt;hostname&gt;your-hostname&lt;/hostname&gt;
+    &lt;os&gt;linux&lt;/os&gt;
+    &lt;kernel&gt;unix&lt;/kernel&gt;
+    &lt;!-- Git repository information (if applicable) --&gt;
+    &lt;git_repository&gt;
+      &lt;url&gt;https://github.com/username/repo&lt;/url&gt;
+      &lt;host&gt;github.com&lt;/host&gt;
+      &lt;owner&gt;username&lt;/owner&gt;
+      &lt;name&gt;repo&lt;/name&gt;
+    &lt;/git_repository&gt;
+  &lt;/system_info&gt;
+  &lt;directory name=&quot;project&quot; path=&quot;project&quot;&gt;
+    &lt;metadata&gt;
+      &lt;size&gt;4096&lt;/size&gt;
+      &lt;modified&gt;2025-03-26T12:34:56+00:00&lt;/modified&gt;
+      &lt;permissions&gt;755&lt;/permissions&gt;
+    &lt;/metadata&gt;
+    &lt;contents&gt;
+      &lt;file name=&quot;example.rs&quot; path=&quot;project/example.rs&quot;&gt;
+        &lt;metadata&gt;
+          &lt;size&gt;1024&lt;/size&gt;
+          &lt;modified&gt;2025-03-26T12:34:56+00:00&lt;/modified&gt;
+          &lt;permissions&gt;644&lt;/permissions&gt;
+        &lt;/metadata&gt;
+        &lt;content&gt;&lt;![CDATA[fn main() {
+    println!(&quot;Hello, world!&quot;);
+}]]&gt;&lt;/content&gt;
+      &lt;/file&gt;
+      &lt;!-- More files and directories --&gt;
+    &lt;/contents&gt;
+  &lt;/directory&gt;
+&lt;/directory_scan&gt;
+```
+
+## Example Output
+
+When running `dumpfs`, you&apos;ll initially see scanning messages and a progress bar. After completion, the progress information is automatically cleared, and you&apos;ll see a comprehensive summary with the processed files followed by extraction statistics:
+
+```
+📋  PROCESSED FILES
+╭────────────────┬───────┬─────────────╮
+│ File Path      │ Lines │ Est. Tokens │
+├────────────────┼───────┼─────────────┤
+│ src/scanner.rs │ 461   │ 4.1K        │
+│ src/tests.rs   │ 330   │ 2.9K        │
+│ src/report.rs  │ 272   │ 2.1K        │
+│ src/writer.rs  │ 202   │ 2.0K        │
+│ README.md      │ 170   │ 1.5K        │
+│ src/utils.rs   │ 209   │ 1.2K        │
+│ src/config.rs  │ 119   │ 928         │
+│ src/main.rs    │ 113   │ 870         │
+│ src/types.rs   │ 95    │ 538         │
+│ src/lib.rs     │ 27    │ 188         │
+│ Cargo.toml     │ 29    │ 135         │
+╰────────────────┴───────┴─────────────╯
+
+✅  EXTRACTION COMPLETE
+╭────────────────────┬─────────────────────────────╮
+│ Metric             │ Value                       │
+├────────────────────┼─────────────────────────────┤
+│ 📂 Output File     │ .dumpfs.context.xml         │
+│ ⏱️ Process Time    │ 10.8125ms                   │
+│ 📄 Files Processed │ 12                          │
+│ 📝 Total Lines     │ 3.0K                        │
+│ 📦 LLM Tokens      │ 21.2K tokens (counted)      │
+│ 🔄 Cache Hit Rate  │ 100.0% (12 hits / 12 total) │
+╰────────────────────┴─────────────────────────────╯
+```
+
+The output provides:
+- A detailed breakdown of each file with line counts and token counts
+- File paths displayed relative to the project root
+- Human-readable numbers with K suffixes for large values
+- Total processing time with millisecond precision
+- Total number of files processed
+- Total line count
+- Exact token usage for LLM context (when using a model)
+- Cache hit rate showing tokenization efficiency
+
+This information is particularly valuable when preparing context for LLMs, as it helps you understand the size and composition of the context you&apos;re providing.
+
+## Token Caching
+
+When using the `--model` option, dumpfs implements intelligent caching of tokenized content:
+
+- Only tokenizes files that haven&apos;t been processed before or have changed
+- Persists cache between runs in `~/.cache/dumpfs/[project_path].token_cache.json`
+- Automatically cleans up old cache entries (older than 7 days)
+- Reports cache hit rate in the output summary
+
+This caching mechanism significantly improves performance when running the tool multiple times on the same codebase, especially with API-based tokenizers like those from OpenAI or Anthropic.
+
+**First run with caching:**
+```
+📦 LLM Tokens      │ 21.2K tokens (counted)      │
+🔄 Cache Hit Rate  │ 0.0% (0 hits / 12 total)    │
+```
+
+**Subsequent runs:**
+```
+📦 LLM Tokens      │ 21.2K tokens (counted)      │
+🔄 Cache Hit Rate  │ 100.0% (12 hits / 12 total) │
+```
+
+Tokenization is often the most time-consuming part of the process, especially when using remote API-based tokenizers, so this caching mechanism can dramatically improve performance for repeated scans.
+
+## License
+
+MIT
+</content>
+      </file>
     </contents>
   </directory>
 </directory_scan>

@@ -137,6 +137,8 @@ impl Tokenizer for CachingTokenizer {
 
 #[cfg(test)]
 mod tests {
+    use tempfile::tempdir;
+
     use super::*;
     use crate::tokenizer::error::TokenizerResult;
     use std::env;
@@ -247,14 +249,15 @@ mod tests {
     #[test]
     #[ignore] // Skip this test by default since it requires an API key
     fn test_claude_tokenizer() {
+        let tmp_dir = tempdir().expect("Should create temp dir");
+        let test_dir = tmp_dir.path().to_str().unwrap();
+
         // Only run this test if ANTHROPIC_API_KEY is set
         match env::var("ANTHROPIC_API_KEY") {
             Ok(api_key) if !api_key.is_empty() => {
-                let tokenizer = create_tokenizer(Model::Sonnet37, "test_dir")
+                let tokenizer = create_tokenizer(Model::Sonnet37, test_dir)
                     .expect("Tokenizer creation should succeed when API key is set");
                 let result = tokenizer.count_tokens("Hello, Claude!");
-
-                assert!(result.is_ok());
                 let count = result.expect("Token count should be valid with valid API key");
                 assert!(count.tokens > 0);
             }

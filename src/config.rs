@@ -80,6 +80,10 @@ pub struct Args {
     /// Policy for handling Git repository caching
     #[clap(long, value_enum, default_value_t = GitCachePolicy::default())]
     pub git_cache_policy: GitCachePolicy,
+
+    /// Copy output to clipboard
+    #[clap(long, help = "Copy output to system clipboard")]
+    pub clip: bool,
 }
 
 /// Application configuration
@@ -117,6 +121,9 @@ pub struct Config {
 
     /// Policy for handling Git repository caching
     pub git_cache_policy: GitCachePolicy,
+
+    /// Copy output to clipboard
+    pub clip: bool,
 }
 
 impl Config {
@@ -134,6 +141,7 @@ impl Config {
             repo_url: None,
             git_repo: None,
             git_cache_policy: args.git_cache_policy,
+            clip: args.clip,
         }
     }
 
