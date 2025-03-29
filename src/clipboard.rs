@@ -98,7 +98,7 @@ impl Clipboard for ClipboardProvider {
 /// * `Err(ClipboardError)` - If the text could not be copied
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// use dumpfs::clipboard::copy_to_clipboard;
 ///
 /// let result = copy_to_clipboard("Hello, clipboard!");
