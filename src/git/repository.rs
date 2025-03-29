@@ -40,6 +40,11 @@ impl Repository {
         // Setup builder with progress reporting
         let mut builder = git2::build::RepoBuilder::new();
 
+        // Configure fetch options with zero depth for shallow clone
+        let mut fetch_options = FetchOptions::new();
+        fetch_options.download_tags(git2::AutotagOption::None);
+        fetch_options.depth(1);
+
         if let Some(reporter) = progress {
             let mut callbacks = RemoteCallbacks::new();
             callbacks.transfer_progress(|stats| {
@@ -56,10 +61,10 @@ impl Repository {
                 true
             });
 
-            let mut fetch_options = FetchOptions::new();
             fetch_options.remote_callbacks(callbacks);
-            builder.fetch_options(fetch_options);
         }
+
+        builder.fetch_options(fetch_options);
 
         // Clone the repository
         let repo = builder
@@ -73,6 +78,8 @@ impl Repository {
     pub fn pull<P: ProgressReporter>(&mut self, progress: Option<&P>) -> GitResult<()> {
         // Set up fetch options with progress reporting
         let mut fetch_options = FetchOptions::new();
+        fetch_options.download_tags(git2::AutotagOption::None);
+        fetch_options.depth(0); // Set fetch depth to zero for minimal history
 
         if let Some(reporter) = progress {
             let mut callbacks = RemoteCallbacks::new();
@@ -174,6 +181,8 @@ impl RepositoryBuilder {
         });
 
         let mut fetch_options = FetchOptions::new();
+        fetch_options.download_tags(git2::AutotagOption::None);
+        fetch_options.depth(0); // Set fetch depth to zero for minimal history
         fetch_options.remote_callbacks(callbacks);
         self.fetch_options = Some(fetch_options);
 

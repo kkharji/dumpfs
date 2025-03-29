@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<directory_scan timestamp="2025-03-29T06:53:35.433744880+03:00">
+<directory_scan timestamp="2025-03-29T07:10:11.178025952+03:00">
   <system_info>
     <hostname>penzu</hostname>
     <os>linux</os>
@@ -600,7 +600,7 @@ impl Repository {
         // Configure fetch options with zero depth for shallow clone
         let mut fetch_options = FetchOptions::new();
         fetch_options.download_tags(git2::AutotagOption::None);
-        fetch_options.depth(0);  // Set clone depth to zero for minimal history
+        fetch_options.depth(1);
 
         if let Some(reporter) = progress {
             let mut callbacks = RemoteCallbacks::new();
@@ -636,7 +636,7 @@ impl Repository {
         // Set up fetch options with progress reporting
         let mut fetch_options = FetchOptions::new();
         fetch_options.download_tags(git2::AutotagOption::None);
-        fetch_options.depth(0);  // Set fetch depth to zero for minimal history
+        fetch_options.depth(0); // Set fetch depth to zero for minimal history
 
         if let Some(reporter) = progress {
             let mut callbacks = RemoteCallbacks::new();
@@ -739,7 +739,7 @@ impl RepositoryBuilder {
 
         let mut fetch_options = FetchOptions::new();
         fetch_options.download_tags(git2::AutotagOption::None);
-        fetch_options.depth(0);  // Set fetch depth to zero for minimal history
+        fetch_options.depth(0); // Set fetch depth to zero for minimal history
         fetch_options.remote_callbacks(callbacks);
         self.fetch_options = Some(fetch_options);
 
