@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 
 use chrono::Local;
-use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesCData, BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::Writer;
 
 use crate::config::Config;
@@ -163,12 +163,8 @@ impl XmlWriter {
         // Write content
         writer.write_event(Event::Start(BytesStart::new("content")))?;
         if let Some(content) = &file.content {
-            // Split content into chunks and write as text events to avoid XML parsing issues
-            for chunk in content.as_bytes().chunks(4096) {
-                if let Ok(text) = std::str::from_utf8(chunk) {
-                    writer.write_event(Event::Text(BytesText::new(text)))?;
-                }
-            }
+            // Use CDATA section to preserve formatting and avoid XML parsing issues
+            writer.write_event(Event::CData(BytesCData::new(content)))?;
         }
         writer.write_event(Event::End(BytesEnd::new("content")))?;
 
