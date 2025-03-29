@@ -1,37 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<directory_scan timestamp="2025-03-28T00:14:04.393260960+03:00">
+<directory_scan timestamp="2025-03-29T06:25:17.595718890+03:00">
   <system_info>
     <hostname>penzu</hostname>
     <os>linux</os>
     <kernel>unix</kernel>
   </system_info>
   <directory name="dumpfs" path="dumpfs">
-    <metadata>
-      <size>164</size>
-      <modified>2025-03-28T00:13:54.360042125+03:00</modified>
-      <permissions>755</permissions>
-    </metadata>
     <contents>
       <directory name="src" path="/home/user/projs/dumpfs/src">
-        <metadata>
-          <size>222</size>
-          <modified>2025-03-27T23:46:18.089401758+03:00</modified>
-          <permissions>755</permissions>
-        </metadata>
         <contents>
           <directory name="git" path="/home/user/projs/dumpfs/src/git">
-            <metadata>
-              <size>104</size>
-              <modified>2025-03-27T22:07:09.433112497+03:00</modified>
-              <permissions>755</permissions>
-            </metadata>
             <contents>
               <file name="error.rs" path="/home/user/projs/dumpfs/src/git/error.rs">
-                <metadata>
-                  <size>989</size>
-                  <modified>2025-03-27T22:14:42.601872085+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>/*!
  * Error types for Git operations
  */
@@ -75,11 +55,6 @@ pub type GitResult&lt;T&gt; = Result&lt;T, GitError&gt;;
 </content>
               </file>
               <file name="progress.rs" path="/home/user/projs/dumpfs/src/git/progress.rs">
-                <metadata>
-                  <size>1407</size>
-                  <modified>2025-03-27T22:14:42.602872083+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>/*!
  * Progress reporting for Git operations
  */
@@ -139,11 +114,6 @@ where
 </content>
               </file>
               <file name="url.rs" path="/home/user/projs/dumpfs/src/git/url.rs">
-                <metadata>
-                  <size>9270</size>
-                  <modified>2025-03-27T23:26:19.612470211+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>/*!
  * Git URL parsing and handling
  */
@@ -420,11 +390,6 @@ mod tests {
 </content>
               </file>
               <file name="cache.rs" path="/home/user/projs/dumpfs/src/git/cache.rs">
-                <metadata>
-                  <size>3550</size>
-                  <modified>2025-03-27T22:14:42.601872085+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>/*!
  * Git repository cache management
  */
@@ -548,11 +513,6 @@ mod tests {
 </content>
               </file>
               <file name="repository.rs" path="/home/user/projs/dumpfs/src/git/repository.rs">
-                <metadata>
-                  <size>6808</size>
-                  <modified>2025-03-27T23:26:19.610470211+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>/*!
  * Git repository operations
  */
@@ -766,11 +726,6 @@ impl RepositoryBuilder {
 </content>
               </file>
               <file name="mod.rs" path="/home/user/projs/dumpfs/src/git/mod.rs">
-                <metadata>
-                  <size>2472</size>
-                  <modified>2025-03-27T22:14:42.601872085+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>/*!
  * Git repository handling functionality
  */
@@ -860,25 +815,10 @@ mod tests {
             </contents>
           </directory>
           <directory name="tokenizer" path="/home/user/projs/dumpfs/src/tokenizer">
-            <metadata>
-              <size>76</size>
-              <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-              <permissions>755</permissions>
-            </metadata>
             <contents>
               <directory name="provider" path="/home/user/projs/dumpfs/src/tokenizer/provider">
-                <metadata>
-                  <size>82</size>
-                  <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-                  <permissions>755</permissions>
-                </metadata>
                 <contents>
                   <file name="anthropic.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/anthropic.rs">
-                    <metadata>
-                      <size>2249</size>
-                      <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-                      <permissions>644</permissions>
-                    </metadata>
                     <content>//! Anthropic Claude tokenizer implementation
 
 use reqwest::blocking::Client;
@@ -962,11 +902,6 @@ impl Provider for ClaudeProvider {
 </content>
                   </file>
                   <file name="huggingface.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/huggingface.rs">
-                    <metadata>
-                      <size>2364</size>
-                      <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-                      <permissions>644</permissions>
-                    </metadata>
                     <content>//! HuggingFace tokenizer implementation
 
 use once_cell::sync::OnceCell;
@@ -1047,11 +982,6 @@ impl Provider for HuggingFaceProvider {
 </content>
                   </file>
                   <file name="mod.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/mod.rs">
-                    <metadata>
-                      <size>454</size>
-                      <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-                      <permissions>644</permissions>
-                    </metadata>
                     <content>//! Provider implementations for different tokenizer backends
 
 pub mod anthropic;
@@ -1071,11 +1001,6 @@ pub trait Provider: Send + Sync {
 </content>
                   </file>
                   <file name="openai.rs" path="/home/user/projs/dumpfs/src/tokenizer/provider/openai.rs">
-                    <metadata>
-                      <size>901</size>
-                      <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-                      <permissions>644</permissions>
-                    </metadata>
                     <content>//! OpenAI tokenizer implementation using tiktoken
 
 use tiktoken_rs::CoreBPE;
@@ -1115,11 +1040,6 @@ impl Provider for OpenAIProvider {
                 </contents>
               </directory>
               <file name="cache.rs" path="/home/user/projs/dumpfs/src/tokenizer/cache.rs">
-                <metadata>
-                  <size>6854</size>
-                  <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>//! Token cache implementation
 
 use std::collections::hash_map::DefaultHasher;
@@ -1368,11 +1288,6 @@ pub fn get_cache_path(project_dir: &amp;str) -&gt; TokenizerResult&lt;PathBuf&gt
 </content>
               </file>
               <file name="error.rs" path="/home/user/projs/dumpfs/src/tokenizer/error.rs">
-                <metadata>
-                  <size>1324</size>
-                  <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>//! Error types for the tokenizer module
 
 use std::io;
@@ -1429,11 +1344,6 @@ impl From&lt;reqwest::Error&gt; for TokenizerError {
 </content>
               </file>
               <file name="mod.rs" path="/home/user/projs/dumpfs/src/tokenizer/mod.rs">
-                <metadata>
-                  <size>7792</size>
-                  <modified>2025-03-28T00:01:34.065338479+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>//! Tokenizer module for token counting with different LLM models
 //!
 //! Handles tokenization for various LLM models from different providers
@@ -1707,11 +1617,6 @@ mod tests {
 </content>
               </file>
               <file name="model.rs" path="/home/user/projs/dumpfs/src/tokenizer/model.rs">
-                <metadata>
-                  <size>2984</size>
-                  <modified>2025-03-27T22:51:17.106978586+03:00</modified>
-                  <permissions>644</permissions>
-                </metadata>
                 <content>//! Model definitions and metadata
 
 use clap::ValueEnum;
@@ -1840,20 +1745,10 @@ pub enum ModelProvider {
             </contents>
           </directory>
           <directory name="tests" path="/home/user/projs/dumpfs/src/tests">
-            <metadata>
-              <size>0</size>
-              <modified>2025-03-27T23:46:30.882373435+03:00</modified>
-              <permissions>755</permissions>
-            </metadata>
             <contents>
             </contents>
           </directory>
           <file name="types.rs" path="/home/user/projs/dumpfs/src/types.rs">
-            <metadata>
-              <size>2152</size>
-              <modified>2025-03-26T22:36:05.617711743+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Core types and data structures for the DumpFS application
  */
@@ -1952,11 +1847,6 @@ pub enum Node {
 </content>
           </file>
           <file name="utils.rs" path="/home/user/projs/dumpfs/src/utils.rs">
-            <metadata>
-              <size>4749</size>
-              <modified>2025-03-27T00:25:03.921940764+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Utility functions for DumpFS
  */
@@ -2051,10 +1941,17 @@ pub static DEFAULT_IGNORE: Lazy&lt;Vec&lt;&amp;&apos;static str&gt;&gt; = Lazy::
         &quot;.npm&quot;,
         &quot;package-lock.json&quot;,
         &quot;yarn.lock&quot;,
+        &quot;pnpm-lock.yaml&quot;,
+        &quot;.pnpm&quot;,
         &quot;.yarn&quot;,
+        &quot;yarn-error.log&quot;,
         &quot;vendor&quot;,
         &quot;composer.lock&quot;,
         &quot;.pnpm-store&quot;,
+        &quot;npm-shrinkwrap.json&quot;,
+        &quot;lerna-debug.log&quot;,
+        &quot;.yalc&quot;,
+        &quot;.turbo&quot;,
         // Build &amp; Dist
         &quot;dist&quot;,
         &quot;build&quot;,
@@ -2064,6 +1961,16 @@ pub static DEFAULT_IGNORE: Lazy&lt;Vec&lt;&amp;&apos;static str&gt;&gt; = Lazy::
         &quot;*.min.js&quot;,
         &quot;*.min.css&quot;,
         &quot;bundle.*&quot;,
+        &quot;.parcel-cache&quot;,
+        &quot;.next&quot;,
+        &quot;.nuxt&quot;,
+        &quot;.output&quot;,
+        &quot;.cache&quot;,
+        &quot;.rollup.cache&quot;,
+        &quot;.webpack&quot;,
+        &quot;.serverless&quot;,
+        &quot;.netlify&quot;,
+        &quot;storybook-static&quot;,
         // Python
         &quot;__pycache__&quot;,
         &quot;.pytest_cache&quot;,
@@ -2169,11 +2076,6 @@ pub static DEFAULT_IGNORE: Lazy&lt;Vec&lt;&amp;&apos;static str&gt;&gt; = Lazy::
 </content>
           </file>
           <file name="writer.rs" path="/home/user/projs/dumpfs/src/writer.rs">
-            <metadata>
-              <size>9273</size>
-              <modified>2025-03-27T22:14:42.620872051+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * XML writer implementation for DumpFS
  */
@@ -2301,8 +2203,10 @@ impl XmlWriter {
         start_tag.push_attribute((&quot;path&quot;, dir.path.to_string_lossy().as_ref()));
         writer.write_event(Event::Start(start_tag))?;
 
-        // Write metadata
-        self.write_metadata(&amp;dir.metadata, writer)?;
+        // Write metadata only if enabled
+        if self.config.include_metadata {
+            self.write_metadata(&amp;dir.metadata, writer)?;
+        }
 
         // Write contents
         writer.write_event(Event::Start(BytesStart::new(&quot;contents&quot;)))?;
@@ -2329,8 +2233,10 @@ impl XmlWriter {
         start_tag.push_attribute((&quot;path&quot;, file.path.to_string_lossy().as_ref()));
         writer.write_event(Event::Start(start_tag))?;
 
-        // Write metadata
-        self.write_metadata(&amp;file.metadata, writer)?;
+        // Write metadata only if enabled
+        if self.config.include_metadata {
+            self.write_metadata(&amp;file.metadata, writer)?;
+        }
 
         // Write content
         writer.write_event(Event::Start(BytesStart::new(&quot;content&quot;)))?;
@@ -2360,8 +2266,10 @@ impl XmlWriter {
         start_tag.push_attribute((&quot;path&quot;, binary.path.to_string_lossy().as_ref()));
         writer.write_event(Event::Start(start_tag))?;
 
-        // Write metadata
-        self.write_metadata(&amp;binary.metadata, writer)?;
+        // Write metadata only if enabled
+        if self.config.include_metadata {
+            self.write_metadata(&amp;binary.metadata, writer)?;
+        }
 
         writer.write_event(Event::End(BytesEnd::new(&quot;binary&quot;)))?;
 
@@ -2379,8 +2287,10 @@ impl XmlWriter {
         start_tag.push_attribute((&quot;path&quot;, symlink.path.to_string_lossy().as_ref()));
         writer.write_event(Event::Start(start_tag))?;
 
-        // Write metadata
-        self.write_metadata(&amp;symlink.metadata, writer)?;
+        // Write metadata only if enabled
+        if self.config.include_metadata {
+            self.write_metadata(&amp;symlink.metadata, writer)?;
+        }
 
         // Write target
         writer.write_event(Event::Start(BytesStart::new(&quot;target&quot;)))?;
@@ -2424,11 +2334,6 @@ impl XmlWriter {
 </content>
           </file>
           <file name="config.rs" path="/home/user/projs/dumpfs/src/config.rs">
-            <metadata>
-              <size>6116</size>
-              <modified>2025-03-27T23:46:55.250321209+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Configuration handling for DumpFS
  */
@@ -2495,6 +2400,10 @@ pub struct Args {
     /// Path to custom .gitignore file
     #[clap(long)]
     pub gitignore_path: Option&lt;String&gt;,
+    
+    /// Include file and directory metadata (size, modified time, permissions)
+    #[clap(long, help = &quot;Include file and directory metadata in the XML output&quot;)]
+    pub include_metadata: bool,
 
     /// LLM model to use for tokenization (enables token counting)
     #[clap(long, value_enum)]
@@ -2553,6 +2462,9 @@ pub struct Config {
     /// Policy for handling Git repository caching
     pub git_cache_policy: GitCachePolicy,
 
+    /// Include file and directory metadata
+    pub include_metadata: bool,
+
     /// Copy output to clipboard
     pub clip: bool,
 }
@@ -2572,6 +2484,7 @@ impl Config {
             repo_url: None,
             git_repo: None,
             git_cache_policy: args.git_cache_policy,
+            include_metadata: args.include_metadata,
             clip: args.clip,
         }
     }
@@ -2626,11 +2539,6 @@ impl Config {
 </content>
           </file>
           <file name="lib.rs" path="/home/user/projs/dumpfs/src/lib.rs">
-            <metadata>
-              <size>958</size>
-              <modified>2025-03-27T23:36:37.252491301+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * DumpFS - Generate XML representation of directory contents for LLM context
  *
@@ -2669,11 +2577,6 @@ pub const VERSION: &amp;str = env!(&quot;CARGO_PKG_VERSION&quot;);
 </content>
           </file>
           <file name="main.rs" path="/home/user/projs/dumpfs/src/main.rs">
-            <metadata>
-              <size>14446</size>
-              <modified>2025-03-27T23:46:41.813349730+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Command-line interface for DumpFS
  */
@@ -3099,11 +3002,6 @@ fn main() -&gt; Result&lt;()&gt; {
 </content>
           </file>
           <file name="report.rs" path="/home/user/projs/dumpfs/src/report.rs">
-            <metadata>
-              <size>9585</size>
-              <modified>2025-03-27T22:14:42.607872074+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Reporting functionality for DumpFS
  *
@@ -3408,11 +3306,6 @@ impl Reporter {
 </content>
           </file>
           <file name="tests.rs" path="/home/user/projs/dumpfs/src/tests.rs">
-            <metadata>
-              <size>13174</size>
-              <modified>2025-03-27T23:46:52.760326443+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Tests for DumpFS functionality
  */
@@ -3527,6 +3420,7 @@ fn test_basic_scan() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -3575,6 +3469,7 @@ fn test_ignore_patterns() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -3617,6 +3512,7 @@ fn test_include_patterns() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -3659,6 +3555,7 @@ fn test_large_file_handling() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -3697,6 +3594,7 @@ fn test_xml_validity() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -3749,6 +3647,7 @@ fn test_respect_gitignore() -&gt; io::Result&lt;()&gt; {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -3810,6 +3709,7 @@ fn test_output_file_path_for_git_repo() {
             repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
             git_repo: Some(git_repo.clone()),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            include_metadata: false,
             clip: false,
         };
 
@@ -3834,11 +3734,6 @@ fn test_output_file_path_for_git_repo() {
 </content>
           </file>
           <file name="scanner.rs" path="/home/user/projs/dumpfs/src/scanner.rs">
-            <metadata>
-              <size>30024</size>
-              <modified>2025-03-27T23:39:42.960516146+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Directory and file scanning functionality
  */
@@ -4576,6 +4471,7 @@ mod tests {
             repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
             git_repo: Some(git_repo),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            include_metadata: false,
             clip: false,
         };
 
@@ -4627,6 +4523,7 @@ mod tests {
             repo_url: Some(&quot;https://github.com/username/repo&quot;.to_string()),
             git_repo: Some(git_repo),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            include_metadata: false,
             clip: false,
         };
 
@@ -4653,11 +4550,6 @@ mod tests {
 </content>
           </file>
           <file name="error.rs" path="/home/user/projs/dumpfs/src/error.rs">
-            <metadata>
-              <size>3030</size>
-              <modified>2025-03-27T23:26:19.607470211+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>//! Global error handling for dumpfs
 //!
 //! This module provides a centralized error type that can represent errors
@@ -4781,11 +4673,6 @@ impl From&lt;DumpFsError&gt; for io::Error {
 </content>
           </file>
           <file name="clipboard.rs" path="/home/user/projs/dumpfs/src/clipboard.rs">
-            <metadata>
-              <size>16570</size>
-              <modified>2025-03-28T00:13:24.410051240+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Clipboard support for DumpFS
  *
@@ -4800,9 +4687,6 @@ use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
 use thiserror::Error;
-
-// Constants for version checking
-const TMUX_MIN_VERSION_WITH_W_FLAG: (u32, u32, u32) = (3, 2, 0);
 
 /// Error type for clipboard operations
 #[derive(Error, Debug)]
@@ -4889,7 +4773,7 @@ impl Clipboard for ClipboardProvider {
 /// * `Err(ClipboardError)` - If the text could not be copied
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// use dumpfs::clipboard::copy_to_clipboard;
 ///
 /// let result = copy_to_clipboard(&quot;Hello, clipboard!&quot;);
@@ -5084,94 +4968,6 @@ fn is_tmux_running() -&gt; bool {
 // Tmux Version Handling
 //--------------------------------------------------------------------
 
-/// Cache for tmux version check result
-static TMUX_VERSION_W_FLAG: OnceLock&lt;bool&gt; = OnceLock::new();
-
-/// Determine if we should use the `-w` flag for tmux load-buffer command
-/// This flag is needed for tmux 3.2.0 and newer versions to properly integrate with system clipboard
-///
-/// Result is cached after first call for performance.
-fn should_use_tmux_w_flag() -&gt; Option&lt;bool&gt; {
-    // Return cached result if available
-    if let Some(result) = TMUX_VERSION_W_FLAG.get() {
-        return Some(*result);
-    }
-
-    // Calculate and cache the result
-    let result = compute_tmux_w_flag_requirement()?;
-    TMUX_VERSION_W_FLAG.set(result).ok()?;
-    Some(result)
-}
-
-/// Compute whether tmux `-w` flag should be used (internal helper)
-fn compute_tmux_w_flag_requirement() -&gt; Option&lt;bool&gt; {
-    // Run tmux -V to get version information
-    let output = Command::new(&quot;tmux&quot;).arg(&quot;-V&quot;).output().ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    // Parse the version string
-    let version_str = String::from_utf8_lossy(&amp;output.stdout);
-    let parsed_version = parse_tmux_version(&amp;version_str)?;
-
-    // The -w flag is supported in tmux 3.2.0 and later
-    Some(version_ge(parsed_version, TMUX_MIN_VERSION_WITH_W_FLAG))
-}
-
-/// Parse a tmux version string into a tuple of (major, minor, patch)
-fn parse_tmux_version(version_str: &amp;str) -&gt; Option&lt;(u32, u32, u32)&gt; {
-    // Common format: &quot;tmux 3.2a&quot; or &quot;tmux 3.2&quot; or &quot;tmux 3.2.1&quot;
-    let version_parts: Vec&lt;&amp;str&gt; = version_str.split_whitespace().collect();
-    if version_parts.len() &lt; 2 {
-        return None;
-    }
-
-    // Extract the version number part
-    let mut version_num = version_parts[1].to_string();
-
-    // Remove any alphabetical suffix (like &quot;a&quot; in &quot;3.2a&quot;)
-    version_num = version_num
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == &apos;.&apos;)
-        .collect();
-
-    // Split into components
-    let components: Vec&lt;&amp;str&gt; = version_num.split(&apos;.&apos;).collect();
-
-    // Parse major
-    let major = components.first().and_then(|v| v.parse::&lt;u32&gt;().ok())?;
-
-    // Parse minor (default to 0 if not present)
-    let minor = components
-        .get(1)
-        .and_then(|v| v.parse::&lt;u32&gt;().ok())
-        .unwrap_or(0);
-
-    // Parse patch (default to 0 if not present)
-    let patch = components
-        .get(2)
-        .and_then(|v| v.parse::&lt;u32&gt;().ok())
-        .unwrap_or(0);
-
-    Some((major, minor, patch))
-}
-
-/// Compare two version tuples
-fn version_ge(version: (u32, u32, u32), min_version: (u32, u32, u32)) -&gt; bool {
-    // Compare major, minor, and patch versions in sequence
-    match version.0.cmp(&amp;min_version.0) {
-        std::cmp::Ordering::Greater =&gt; true,
-        std::cmp::Ordering::Less =&gt; false,
-        std::cmp::Ordering::Equal =&gt; match version.1.cmp(&amp;min_version.1) {
-            std::cmp::Ordering::Greater =&gt; true,
-            std::cmp::Ordering::Less =&gt; false,
-            std::cmp::Ordering::Equal =&gt; version.2 &gt;= min_version.2,
-        },
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -5236,190 +5032,85 @@ pub mod tests {
         let clipboard_content = String::from_utf8_lossy(&amp;output.stdout);
         assert_eq!(clipboard_content.trim(), test_text);
     }
-
-    #[test]
-    fn test_parse_tmux_version() {
-        // Test exact version formats
-        assert_eq!(parse_tmux_version(&quot;tmux 3.2&quot;), Some((3, 2, 0)));
-        assert_eq!(parse_tmux_version(&quot;tmux 3.2a&quot;), Some((3, 2, 0)));
-        assert_eq!(parse_tmux_version(&quot;tmux 3.2.1&quot;), Some((3, 2, 1)));
-        assert_eq!(parse_tmux_version(&quot;tmux 4.0&quot;), Some((4, 0, 0)));
-
-        // Test invalid formats
-        assert_eq!(parse_tmux_version(&quot;tmux&quot;), None);
-        assert_eq!(parse_tmux_version(&quot;not-tmux 3.2&quot;), Some((3, 2, 0))); // Should still work if second part is valid
-        assert_eq!(parse_tmux_version(&quot;&quot;), None);
-    }
-
-    #[test]
-    fn test_version_compare() {
-        // Greater major
-        assert!(version_ge((4, 0, 0), (3, 2, 0)));
-
-        // Equal major, greater minor
-        assert!(version_ge((3, 3, 0), (3, 2, 0)));
-
-        // Equal major and minor, greater patch
-        assert!(version_ge((3, 2, 1), (3, 2, 0)));
-
-        // Equal versions
-        assert!(version_ge((3, 2, 0), (3, 2, 0)));
-
-        // Less than cases
-        assert!(!version_ge((3, 1, 0), (3, 2, 0)));
-        assert!(!version_ge((2, 9, 0), (3, 2, 0)));
-        assert!(!version_ge((3, 2, 0), (3, 2, 1)));
-    }
-
-    #[test]
-    fn test_tmux_version_check() {
-        // Only run if tmux is available
-        if !command_exists(&quot;tmux&quot;) {
-            return;
-        }
-
-        // Call twice to test caching
-        let result1 = should_use_tmux_w_flag();
-        let result2 = should_use_tmux_w_flag();
-
-        // Results should be the same (from cache)
-        assert_eq!(result1, result2);
-
-        println!(&quot;Should use tmux -w flag: {:?}&quot;, result1);
-
-        // If we have a result, check that the version parsing worked
-        if let Some(use_w) = result1 {
-            // Get the raw version string
-            let output = Command::new(&quot;tmux&quot;)
-                .arg(&quot;-V&quot;)
-                .output()
-                .expect(&quot;Failed to get tmux version&quot;);
-
-            let version_str = String::from_utf8_lossy(&amp;output.stdout);
-            println!(&quot;Tmux version: {}&quot;, version_str);
-
-            // Parse the version
-            if let Some(version) = parse_tmux_version(&amp;version_str) {
-                println!(&quot;Parsed version: {:?}&quot;, version);
-
-                // Verify our result
-                let expected = version_ge(version, TMUX_MIN_VERSION_WITH_W_FLAG);
-                assert_eq!(use_w, expected, &quot;Version check mismatch&quot;);
-            }
-        }
-    }
-
-    #[test]
-    fn test_version_compare_performance() {
-        // Simple performance check - run many comparisons
-        let start = std::time::Instant::now();
-        for _ in 0..10000 {
-            assert!(version_ge((4, 2, 1), (3, 2, 0)));
-            assert!(!version_ge((2, 9, 9), (3, 0, 0)));
-        }
-        let duration = start.elapsed();
-
-        // Should complete quickly
-        println!(&quot;10000 version comparisons took: {:?}&quot;, duration);
-        assert!(duration.as_millis() &lt; 50, &quot;Version comparison is too slow&quot;);
-    }
 }
 </content>
           </file>
         </contents>
       </directory>
       <directory name="tests" path="/home/user/projs/dumpfs/tests">
-        <metadata>
-          <size>48</size>
-          <modified>2025-03-27T23:43:16.131549866+03:00</modified>
-          <permissions>755</permissions>
-        </metadata>
         <contents>
           <file name="clipboard_integration.rs" path="/home/user/projs/dumpfs/tests/clipboard_integration.rs">
-            <metadata>
-              <size>2268</size>
-              <modified>2025-03-28T00:05:47.661214722+03:00</modified>
-              <permissions>644</permissions>
-            </metadata>
             <content>/*!
  * Integration test for clipboard functionality
  */
 
-#[cfg(test)]
-mod tests {
-    use std::env;
-    use std::fs::{self, File};
-    use std::io::Write;
-    use std::process::Command;
+use std::env;
+use std::fs::{self, File};
+use std::io::Write;
+use std::process::Command;
 
-    use tempfile::tempdir;
+use tempfile::tempdir;
 
-    #[test]
-    #[ignore] // This test requires tmux to be running and is ignored by default
-              // To run this test manually use: cargo test --test clipboard_integration -- --ignored
-    fn test_clip_flag() {
-        // Skip if not in a tmux session
-        if env::var(&quot;TMUX&quot;).is_err() {
-            return;
-        }
-
-        // Create a temporary directory with some test files
-        let temp_dir = tempdir().unwrap();
-        let test_file = temp_dir.path().join(&quot;test.txt&quot;);
-        let output_file = temp_dir.path().join(&quot;output.xml&quot;);
-
-        // Write some content to the test file
-        let mut file = File::create(&amp;test_file).unwrap();
-        writeln!(file, &quot;Test content for clipboard integration&quot;).unwrap();
-
-        // Build the project first to ensure binary is available
-        assert!(Command::new(&quot;cargo&quot;)
-            .args([&quot;build&quot;])
-            .status()
-            .unwrap()
-            .success());
-
-        // Run dumpfs with --clip flag
-        // The command format is: dumpfs [OPTIONS] [DIRECTORY_PATH] [OUTPUT_FILE]
-        let status = Command::new(&quot;cargo&quot;)
-            .args([
-                &quot;run&quot;,
-                &quot;--&quot;,
-                &quot;--clip&quot;,
-                &amp;temp_dir.path().to_string_lossy(), // Directory path (positional)
-                &amp;output_file.to_string_lossy(),     // Output file (positional)
-            ])
-            .status()
-            .unwrap();
-
-        // Check that the command succeeded
-        assert!(status.success());
-
-        // Verify that the output file exists
-        assert!(output_file.exists());
-
-        // Get the content from the output file
-        let xml_content = fs::read_to_string(&amp;output_file).unwrap();
-
-        // Get the content from the tmux clipboard
-        let clipboard_output = Command::new(&quot;tmux&quot;).args([&quot;show-buffer&quot;]).output().unwrap();
-
-        let clipboard_content = String::from_utf8_lossy(&amp;clipboard_output.stdout);
-
-        // Verify that the clipboard contains the XML content
-        assert_eq!(xml_content, clipboard_content);
+#[test]
+#[ignore] // This test requires tmux to be running and is ignored by default
+          // To run this test manually use: cargo test --test clipboard_integration -- --ignored
+fn test_clip_flag() {
+    // Skip if not in a tmux session
+    if env::var(&quot;TMUX&quot;).is_err() {
+        return;
     }
+
+    // Create a temporary directory with some test files
+    let temp_dir = tempdir().unwrap();
+    let test_file = temp_dir.path().join(&quot;test.txt&quot;);
+    let output_file = temp_dir.path().join(&quot;output.xml&quot;);
+
+    // Write some content to the test file
+    let mut file = File::create(&amp;test_file).unwrap();
+    writeln!(file, &quot;Test content for clipboard integration&quot;).unwrap();
+
+    // Build the project first to ensure binary is available
+    assert!(Command::new(&quot;cargo&quot;)
+        .args([&quot;build&quot;])
+        .status()
+        .unwrap()
+        .success());
+
+    // Run dumpfs with --clip flag
+    // The command format is: dumpfs [OPTIONS] [DIRECTORY_PATH] [OUTPUT_FILE]
+    let status = Command::new(&quot;cargo&quot;)
+        .args([
+            &quot;run&quot;,
+            &quot;--&quot;,
+            &quot;--clip&quot;,
+            &amp;temp_dir.path().to_string_lossy(), // Directory path (positional)
+            &amp;output_file.to_string_lossy(),     // Output file (positional)
+        ])
+        .status()
+        .unwrap();
+
+    // Check that the command succeeded
+    assert!(status.success());
+
+    // Verify that the output file exists
+    assert!(output_file.exists());
+
+    // Get the content from the output file
+    let xml_content = fs::read_to_string(&amp;output_file).unwrap();
+
+    // Get the content from the tmux clipboard
+    let clipboard_output = Command::new(&quot;tmux&quot;).args([&quot;show-buffer&quot;]).output().unwrap();
+
+    let clipboard_content = String::from_utf8_lossy(&amp;clipboard_output.stdout);
+
+    // Verify that the clipboard contains the XML content
+    assert_eq!(xml_content, clipboard_content);
 }
 </content>
           </file>
         </contents>
       </directory>
       <file name="Cargo.toml" path="dumpfs/Cargo.toml">
-        <metadata>
-          <size>973</size>
-          <modified>2025-03-27T22:07:27.204042067+03:00</modified>
-          <permissions>644</permissions>
-        </metadata>
         <content>[package]
 name = &quot;dumpfs&quot;
 version = &quot;0.1.0&quot;
@@ -5465,11 +5156,6 @@ strip = true
 </content>
       </file>
       <file name="README.md" path="dumpfs/README.md">
-        <metadata>
-          <size>11813</size>
-          <modified>2025-03-27T23:44:05.762558304+03:00</modified>
-          <permissions>644</permissions>
-        </metadata>
         <content># DumpFS: Directory Context Generator for LLMs
 
 `dumpfs` is a command-line tool that generates an XML representation of directory contents, designed specifically for providing context to Large Language Models (LLMs) for coding tasks.

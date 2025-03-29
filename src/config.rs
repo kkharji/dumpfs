@@ -64,6 +64,10 @@ pub struct Args {
     /// Path to custom .gitignore file
     #[clap(long)]
     pub gitignore_path: Option<String>,
+    
+    /// Include file and directory metadata (size, modified time, permissions)
+    #[clap(long, help = "Include file and directory metadata in the XML output")]
+    pub include_metadata: bool,
 
     /// LLM model to use for tokenization (enables token counting)
     #[clap(long, value_enum)]
@@ -122,6 +126,9 @@ pub struct Config {
     /// Policy for handling Git repository caching
     pub git_cache_policy: GitCachePolicy,
 
+    /// Include file and directory metadata
+    pub include_metadata: bool,
+
     /// Copy output to clipboard
     pub clip: bool,
 }
@@ -141,6 +148,7 @@ impl Config {
             repo_url: None,
             git_repo: None,
             git_cache_policy: args.git_cache_policy,
+            include_metadata: args.include_metadata,
             clip: args.clip,
         }
     }

@@ -735,6 +735,7 @@ mod tests {
             repo_url: Some("https://github.com/username/repo".to_string()),
             git_repo: Some(git_repo),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            include_metadata: false,
             clip: false,
         };
 
@@ -786,6 +787,7 @@ mod tests {
             repo_url: Some("https://github.com/username/repo".to_string()),
             git_repo: Some(git_repo),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            include_metadata: false,
             clip: false,
         };
 

@@ -112,6 +112,7 @@ fn test_basic_scan() -> io::Result<()> {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -160,6 +161,7 @@ fn test_ignore_patterns() -> io::Result<()> {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -202,6 +204,7 @@ fn test_include_patterns() -> io::Result<()> {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -244,6 +247,7 @@ fn test_large_file_handling() -> io::Result<()> {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -282,6 +286,7 @@ fn test_xml_validity() -> io::Result<()> {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -334,6 +339,7 @@ fn test_respect_gitignore() -> io::Result<()> {
         repo_url: None,
         git_repo: None,
         git_cache_policy: GitCachePolicy::AlwaysPull,
+        include_metadata: false,
         clip: false,
     };
 
@@ -395,6 +401,7 @@ fn test_output_file_path_for_git_repo() {
             repo_url: Some("https://github.com/username/repo".to_string()),
             git_repo: Some(git_repo.clone()),
             git_cache_policy: GitCachePolicy::AlwaysPull,
+            include_metadata: false,
             clip: false,
         };
 

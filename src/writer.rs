@@ -125,8 +125,10 @@ impl XmlWriter {
         start_tag.push_attribute(("path", dir.path.to_string_lossy().as_ref()));
         writer.write_event(Event::Start(start_tag))?;
 
-        // Write metadata
-        self.write_metadata(&dir.metadata, writer)?;
+        // Write metadata only if enabled
+        if self.config.include_metadata {
+            self.write_metadata(&dir.metadata, writer)?;
+        }
 
         // Write contents
         writer.write_event(Event::Start(BytesStart::new("contents")))?;
@@ -153,8 +155,10 @@ impl XmlWriter {
         start_tag.push_attribute(("path", file.path.to_string_lossy().as_ref()));
         writer.write_event(Event::Start(start_tag))?;
 
-        // Write metadata
-        self.write_metadata(&file.metadata, writer)?;
+        // Write metadata only if enabled
+        if self.config.include_metadata {
+            self.write_metadata(&file.metadata, writer)?;
+        }
 
         // Write content
         writer.write_event(Event::Start(BytesStart::new("content")))?;
@@ -184,8 +188,10 @@ impl XmlWriter {
         start_tag.push_attribute(("path", binary.path.to_string_lossy().as_ref()));
         writer.write_event(Event::Start(start_tag))?;
 
-        // Write metadata
-        self.write_metadata(&binary.metadata, writer)?;
+        // Write metadata only if enabled
+        if self.config.include_metadata {
+            self.write_metadata(&binary.metadata, writer)?;
+        }
 
         writer.write_event(Event::End(BytesEnd::new("binary")))?;
 
@@ -203,8 +209,10 @@ impl XmlWriter {
         start_tag.push_attribute(("path", symlink.path.to_string_lossy().as_ref()));
         writer.write_event(Event::Start(start_tag))?;
 
-        // Write metadata
-        self.write_metadata(&symlink.metadata, writer)?;
+        // Write metadata only if enabled
+        if self.config.include_metadata {
+            self.write_metadata(&symlink.metadata, writer)?;
+        }
 
         // Write target
         writer.write_event(Event::Start(BytesStart::new("target")))?;
