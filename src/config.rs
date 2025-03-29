@@ -64,7 +64,7 @@ pub struct Args {
     /// Path to custom .gitignore file
     #[clap(long)]
     pub gitignore_path: Option<String>,
-    
+
     /// Include file and directory metadata (size, modified time, permissions)
     #[clap(long, help = "Include file and directory metadata in the XML output")]
     pub include_metadata: bool,
