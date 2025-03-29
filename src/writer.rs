@@ -43,6 +43,9 @@ impl XmlWriter {
         // Write system info
         self.write_system_info(&mut xml_writer)?;
 
+        // Write repository structure summary
+        self.write_overview(root_node, &mut xml_writer)?;
+
         // Write directory structure
         self.write_directory(root_node, &mut xml_writer)?;
 
@@ -216,6 +219,61 @@ impl XmlWriter {
         writer.write_event(Event::End(BytesEnd::new("target")))?;
 
         writer.write_event(Event::End(BytesEnd::new("symlink")))?;
+
+        Ok(())
+    }
+
+    /// Write repository structure to XML
+    fn write_overview<W: Write>(
+        &self,
+        root_node: &DirectoryNode,
+        writer: &mut Writer<W>,
+    ) -> io::Result<()> {
+        writer.write_event(Event::Start(BytesStart::new("overview")))?;
+
+        // Recursively write the directory structure with only names
+        Self::write_node_overview(root_node, writer)?;
+
+        writer.write_event(Event::End(BytesEnd::new("overview")))?;
+
+        Ok(())
+    }
+
+    /// Write a hierarchical structure node with only names
+    fn write_node_overview<W: Write>(
+        dir: &DirectoryNode,
+        writer: &mut Writer<W>,
+    ) -> io::Result<()> {
+        // Create a directory element with only the name
+        let mut start_tag = BytesStart::new("directory");
+        start_tag.push_attribute(("name", dir.name.as_str()));
+        writer.write_event(Event::Start(start_tag))?;
+
+        // Write child elements (files and directories)
+        for node in &dir.contents {
+            match node {
+                Node::Directory(dir_node) => {
+                    Self::write_node_overview(dir_node, writer)?;
+                }
+                Node::File(file_node) => {
+                    let mut file_tag = BytesStart::new("file");
+                    file_tag.push_attribute(("name", file_node.name.as_str()));
+                    writer.write_event(Event::Empty(file_tag))?;
+                }
+                Node::Binary(bin_node) => {
+                    let mut bin_tag = BytesStart::new("file");
+                    bin_tag.push_attribute(("name", bin_node.name.as_str()));
+                    writer.write_event(Event::Empty(bin_tag))?;
+                }
+                Node::Symlink(symlink_node) => {
+                    let mut link_tag = BytesStart::new("symlink");
+                    link_tag.push_attribute(("name", symlink_node.name.as_str()));
+                    writer.write_event(Event::Empty(link_tag))?;
+                }
+            }
+        }
+
+        writer.write_event(Event::End(BytesEnd::new("directory")))?;
 
         Ok(())
     }

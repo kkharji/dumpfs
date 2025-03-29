@@ -1,10 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<directory_scan timestamp="2025-03-29T06:28:53.827812031+03:00">
+<directory_scan timestamp="2025-03-29T06:53:35.433744880+03:00">
   <system_info>
     <hostname>penzu</hostname>
     <os>linux</os>
     <kernel>unix</kernel>
   </system_info>
+  <overview>
+    <directory name="dumpfs">
+      <directory name="src">
+        <directory name="git">
+          <file name="error.rs"/>
+          <file name="progress.rs"/>
+          <file name="url.rs"/>
+          <file name="cache.rs"/>
+          <file name="repository.rs"/>
+          <file name="mod.rs"/>
+        </directory>
+        <directory name="tokenizer">
+          <directory name="provider">
+            <file name="anthropic.rs"/>
+            <file name="huggingface.rs"/>
+            <file name="mod.rs"/>
+            <file name="openai.rs"/>
+          </directory>
+          <file name="cache.rs"/>
+          <file name="error.rs"/>
+          <file name="mod.rs"/>
+          <file name="model.rs"/>
+        </directory>
+        <file name="types.rs"/>
+        <file name="utils.rs"/>
+        <file name="config.rs"/>
+        <file name="lib.rs"/>
+        <file name="main.rs"/>
+        <file name="report.rs"/>
+        <file name="tests.rs"/>
+        <file name="scanner.rs"/>
+        <file name="error.rs"/>
+        <file name="clipboard.rs"/>
+        <file name="writer.rs"/>
+      </directory>
+      <directory name="tests">
+        <file name="clipboard_integration.rs"/>
+      </directory>
+      <file name="Cargo.toml"/>
+      <file name="README.md"/>
+    </directory>
+  </overview>
   <directory name="dumpfs" path="dumpfs">
     <contents>
       <directory name="src" path="/home/user/projs/dumpfs/src">
@@ -555,6 +597,11 @@ impl Repository {
         // Setup builder with progress reporting
         let mut builder = git2::build::RepoBuilder::new();
 
+        // Configure fetch options with zero depth for shallow clone
+        let mut fetch_options = FetchOptions::new();
+        fetch_options.download_tags(git2::AutotagOption::None);
+        fetch_options.depth(0);  // Set clone depth to zero for minimal history
+
         if let Some(reporter) = progress {
             let mut callbacks = RemoteCallbacks::new();
             callbacks.transfer_progress(|stats| {
@@ -571,10 +618,10 @@ impl Repository {
                 true
             });
 
-            let mut fetch_options = FetchOptions::new();
             fetch_options.remote_callbacks(callbacks);
-            builder.fetch_options(fetch_options);
         }
+
+        builder.fetch_options(fetch_options);
 
         // Clone the repository
         let repo = builder
@@ -588,6 +635,8 @@ impl Repository {
     pub fn pull<P: ProgressReporter>(&mut self, progress: Option<&P>) -> GitResult<()> {
         // Set up fetch options with progress reporting
         let mut fetch_options = FetchOptions::new();
+        fetch_options.download_tags(git2::AutotagOption::None);
+        fetch_options.depth(0);  // Set fetch depth to zero for minimal history
 
         if let Some(reporter) = progress {
             let mut callbacks = RemoteCallbacks::new();
@@ -689,6 +738,8 @@ impl RepositoryBuilder {
         });
 
         let mut fetch_options = FetchOptions::new();
+        fetch_options.download_tags(git2::AutotagOption::None);
+        fetch_options.depth(0);  // Set fetch depth to zero for minimal history
         fetch_options.remote_callbacks(callbacks);
         self.fetch_options = Some(fetch_options);
 
@@ -2138,7 +2189,7 @@ pub struct Args {
     /// Path to custom .gitignore file
     #[clap(long)]
     pub gitignore_path: Option<String>,
-    
+
     /// Include file and directory metadata (size, modified time, permissions)
     #[clap(long, help = "Include file and directory metadata in the XML output")]
     pub include_metadata: bool,
@@ -4511,7 +4562,7 @@ impl Clipboard for ClipboardProvider {
 /// * `Err(ClipboardError)` - If the text could not be copied
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// use dumpfs::clipboard::copy_to_clipboard;
 ///
 /// let result = copy_to_clipboard("Hello, clipboard!");
@@ -4819,6 +4870,9 @@ impl XmlWriter {
         // Write system info
         self.write_system_info(&mut xml_writer)?;
 
+        // Write repository structure summary
+        self.write_overview(root_node, &mut xml_writer)?;
+
         // Write directory structure
         self.write_directory(root_node, &mut xml_writer)?;
 
@@ -4996,6 +5050,61 @@ impl XmlWriter {
         Ok(())
     }
 
+    /// Write repository structure to XML
+    fn write_overview<W: Write>(
+        &self,
+        root_node: &DirectoryNode,
+        writer: &mut Writer<W>,
+    ) -> io::Result<()> {
+        writer.write_event(Event::Start(BytesStart::new("overview")))?;
+
+        // Recursively write the directory structure with only names
+        Self::write_node_overview(root_node, writer)?;
+
+        writer.write_event(Event::End(BytesEnd::new("overview")))?;
+
+        Ok(())
+    }
+
+    /// Write a hierarchical structure node with only names
+    fn write_node_overview<W: Write>(
+        dir: &DirectoryNode,
+        writer: &mut Writer<W>,
+    ) -> io::Result<()> {
+        // Create a directory element with only the name
+        let mut start_tag = BytesStart::new("directory");
+        start_tag.push_attribute(("name", dir.name.as_str()));
+        writer.write_event(Event::Start(start_tag))?;
+
+        // Write child elements (files and directories)
+        for node in &dir.contents {
+            match node {
+                Node::Directory(dir_node) => {
+                    Self::write_node_overview(dir_node, writer)?;
+                }
+                Node::File(file_node) => {
+                    let mut file_tag = BytesStart::new("file");
+                    file_tag.push_attribute(("name", file_node.name.as_str()));
+                    writer.write_event(Event::Empty(file_tag))?;
+                }
+                Node::Binary(bin_node) => {
+                    let mut bin_tag = BytesStart::new("file");
+                    bin_tag.push_attribute(("name", bin_node.name.as_str()));
+                    writer.write_event(Event::Empty(bin_tag))?;
+                }
+                Node::Symlink(symlink_node) => {
+                    let mut link_tag = BytesStart::new("symlink");
+                    link_tag.push_attribute(("name", symlink_node.name.as_str()));
+                    writer.write_event(Event::Empty(link_tag))?;
+                }
+            }
+        }
+
+        writer.write_event(Event::End(BytesEnd::new("directory")))?;
+
+        Ok(())
+    }
+
     /// Write metadata to XML
     fn write_metadata<W: Write>(
         &self,
@@ -5036,70 +5145,67 @@ impl XmlWriter {
  * Integration test for clipboard functionality
  */
 
-#[cfg(test)]
-mod tests {
-    use std::env;
-    use std::fs::{self, File};
-    use std::io::Write;
-    use std::process::Command;
+use std::env;
+use std::fs::{self, File};
+use std::io::Write;
+use std::process::Command;
 
-    use tempfile::tempdir;
+use tempfile::tempdir;
 
-    #[test]
-    #[ignore] // This test requires tmux to be running and is ignored by default
-              // To run this test manually use: cargo test --test clipboard_integration -- --ignored
-    fn test_clip_flag() {
-        // Skip if not in a tmux session
-        if env::var("TMUX").is_err() {
-            return;
-        }
-
-        // Create a temporary directory with some test files
-        let temp_dir = tempdir().unwrap();
-        let test_file = temp_dir.path().join("test.txt");
-        let output_file = temp_dir.path().join("output.xml");
-
-        // Write some content to the test file
-        let mut file = File::create(&test_file).unwrap();
-        writeln!(file, "Test content for clipboard integration").unwrap();
-
-        // Build the project first to ensure binary is available
-        assert!(Command::new("cargo")
-            .args(["build"])
-            .status()
-            .unwrap()
-            .success());
-
-        // Run dumpfs with --clip flag
-        // The command format is: dumpfs [OPTIONS] [DIRECTORY_PATH] [OUTPUT_FILE]
-        let status = Command::new("cargo")
-            .args([
-                "run",
-                "--",
-                "--clip",
-                &temp_dir.path().to_string_lossy(), // Directory path (positional)
-                &output_file.to_string_lossy(),     // Output file (positional)
-            ])
-            .status()
-            .unwrap();
-
-        // Check that the command succeeded
-        assert!(status.success());
-
-        // Verify that the output file exists
-        assert!(output_file.exists());
-
-        // Get the content from the output file
-        let xml_content = fs::read_to_string(&output_file).unwrap();
-
-        // Get the content from the tmux clipboard
-        let clipboard_output = Command::new("tmux").args(["show-buffer"]).output().unwrap();
-
-        let clipboard_content = String::from_utf8_lossy(&clipboard_output.stdout);
-
-        // Verify that the clipboard contains the XML content
-        assert_eq!(xml_content, clipboard_content);
+#[test]
+#[ignore] // This test requires tmux to be running and is ignored by default
+          // To run this test manually use: cargo test --test clipboard_integration -- --ignored
+fn test_clip_flag() {
+    // Skip if not in a tmux session
+    if env::var("TMUX").is_err() {
+        return;
     }
+
+    // Create a temporary directory with some test files
+    let temp_dir = tempdir().unwrap();
+    let test_file = temp_dir.path().join("test.txt");
+    let output_file = temp_dir.path().join("output.xml");
+
+    // Write some content to the test file
+    let mut file = File::create(&test_file).unwrap();
+    writeln!(file, "Test content for clipboard integration").unwrap();
+
+    // Build the project first to ensure binary is available
+    assert!(Command::new("cargo")
+        .args(["build"])
+        .status()
+        .unwrap()
+        .success());
+
+    // Run dumpfs with --clip flag
+    // The command format is: dumpfs [OPTIONS] [DIRECTORY_PATH] [OUTPUT_FILE]
+    let status = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "--clip",
+            &temp_dir.path().to_string_lossy(), // Directory path (positional)
+            &output_file.to_string_lossy(),     // Output file (positional)
+        ])
+        .status()
+        .unwrap();
+
+    // Check that the command succeeded
+    assert!(status.success());
+
+    // Verify that the output file exists
+    assert!(output_file.exists());
+
+    // Get the content from the output file
+    let xml_content = fs::read_to_string(&output_file).unwrap();
+
+    // Get the content from the tmux clipboard
+    let clipboard_output = Command::new("tmux").args(["show-buffer"]).output().unwrap();
+
+    let clipboard_content = String::from_utf8_lossy(&clipboard_output.stdout);
+
+    // Verify that the clipboard contains the XML content
+    assert_eq!(xml_content, clipboard_content);
 }
 ]]></content>
           </file>
