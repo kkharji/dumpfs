@@ -27,7 +27,7 @@ pub use report::{FileReportInfo, ReportFormat, Reporter, ScanReport};
 pub use scanner::Scanner;
 pub use types::{BinaryNode, DirectoryNode, FileNode, FileType, Metadata, Node, SymlinkNode};
 pub use utils::{count_files, format_file_size};
-pub use writer::XmlWriter;
+pub use writer::FsWriterFormatter;
 
 // No process_path export needed
 

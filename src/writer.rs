@@ -4,59 +4,49 @@
 
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
+use std::path::PathBuf;
 
 use chrono::Local;
+use clap::ValueEnum;
 use quick_xml::events::{BytesCData, BytesDecl, BytesEnd, BytesStart, BytesText, Event};
-use quick_xml::Writer;
 
 use crate::config::Config;
 use crate::git::GitHost;
 use crate::types::{BinaryNode, DirectoryNode, FileNode, Metadata, Node, SymlinkNode};
 
+/// Enum for writer formats
+#[derive(Default, Debug, Clone, ValueEnum)]
+pub enum FsWriterFormatter {
+    Xml,
+    #[default]
+    Txt,
+}
+
+impl FsWriterFormatter {
+    pub fn write(&self, config: Config, root_node: &DirectoryNode) -> io::Result<()> {
+        match self {
+            FsWriterFormatter::Xml => XmlWriter::new(config).write(root_node),
+            FsWriterFormatter::Txt => TxtWriter::new(config).write(root_node),
+        }
+    }
+}
+
+/// Trait for writing directory contents
+trait Writer {
+    fn write(&self, root_node: &DirectoryNode) -> io::Result<()>;
+}
+
 /// XML writer for directory contents
-pub struct XmlWriter {
-    /// Writer configuration
+struct XmlWriter {
     config: Config,
 }
 
 impl XmlWriter {
-    /// Create a new XML writer
     pub fn new(config: Config) -> Self {
         Self { config }
     }
 
-    /// Write the directory tree to an XML file
-    pub fn write(&self, root_node: &DirectoryNode) -> io::Result<()> {
-        let file = File::create(&self.config.output_file)?;
-        let writer = BufWriter::new(file);
-        let mut xml_writer = Writer::new_with_indent(writer, b' ', 2);
-
-        // Write XML declaration
-        xml_writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
-
-        // Start directory_scan element with timestamp
-        let mut start_tag = BytesStart::new("directory_scan");
-        let timestamp = Local::now().to_rfc3339();
-        start_tag.push_attribute(("timestamp", timestamp.as_str()));
-        xml_writer.write_event(Event::Start(start_tag))?;
-
-        // Write system info
-        self.write_system_info(&mut xml_writer)?;
-
-        // Write repository structure summary
-        self.write_overview(root_node, &mut xml_writer)?;
-
-        // Write directory structure
-        self.write_directory(root_node, &mut xml_writer)?;
-
-        // End directory_scan element
-        xml_writer.write_event(Event::End(BytesEnd::new("directory_scan")))?;
-
-        Ok(())
-    }
-
-    /// Write system information to XML
-    fn write_system_info<W: Write>(&self, writer: &mut Writer<W>) -> io::Result<()> {
+    fn write_system_info<W: Write>(&self, writer: &mut quick_xml::Writer<W>) -> io::Result<()> {
         writer.write_event(Event::Start(BytesStart::new("system_info")))?;
 
         // Write hostname
@@ -117,11 +107,10 @@ impl XmlWriter {
         Ok(())
     }
 
-    /// Write a directory node to XML
     fn write_directory<W: Write>(
         &self,
         dir: &DirectoryNode,
-        writer: &mut Writer<W>,
+        writer: &mut quick_xml::Writer<W>,
     ) -> io::Result<()> {
         let mut start_tag = BytesStart::new("directory");
         start_tag.push_attribute(("name", dir.name.as_str()));
@@ -151,8 +140,11 @@ impl XmlWriter {
         Ok(())
     }
 
-    /// Write a file node to XML
-    fn write_file<W: Write>(&self, file: &FileNode, writer: &mut Writer<W>) -> io::Result<()> {
+    fn write_file<W: Write>(
+        &self,
+        file: &FileNode,
+        writer: &mut quick_xml::Writer<W>,
+    ) -> io::Result<()> {
         let mut start_tag = BytesStart::new("file");
         start_tag.push_attribute(("name", file.name.as_str()));
         start_tag.push_attribute(("path", file.path.to_string_lossy().as_ref()));
@@ -176,11 +168,10 @@ impl XmlWriter {
         Ok(())
     }
 
-    /// Write a binary file node to XML
     fn write_binary<W: Write>(
         &self,
         binary: &BinaryNode,
-        writer: &mut Writer<W>,
+        writer: &mut quick_xml::Writer<W>,
     ) -> io::Result<()> {
         let mut start_tag = BytesStart::new("binary");
         start_tag.push_attribute(("name", binary.name.as_str()));
@@ -197,11 +188,10 @@ impl XmlWriter {
         Ok(())
     }
 
-    /// Write a symlink node to XML
     fn write_symlink<W: Write>(
         &self,
         symlink: &SymlinkNode,
-        writer: &mut Writer<W>,
+        writer: &mut quick_xml::Writer<W>,
     ) -> io::Result<()> {
         let mut start_tag = BytesStart::new("symlink");
         start_tag.push_attribute(("name", symlink.name.as_str()));
@@ -223,11 +213,10 @@ impl XmlWriter {
         Ok(())
     }
 
-    /// Write repository structure to XML
     fn write_overview<W: Write>(
         &self,
         root_node: &DirectoryNode,
-        writer: &mut Writer<W>,
+        writer: &mut quick_xml::Writer<W>,
     ) -> io::Result<()> {
         writer.write_event(Event::Start(BytesStart::new("overview")))?;
 
@@ -239,10 +228,9 @@ impl XmlWriter {
         Ok(())
     }
 
-    /// Write a hierarchical structure node with only names
     fn write_node_overview<W: Write>(
         dir: &DirectoryNode,
-        writer: &mut Writer<W>,
+        writer: &mut quick_xml::Writer<W>,
     ) -> io::Result<()> {
         // Create a directory element with only the name
         let mut start_tag = BytesStart::new("directory");
@@ -278,11 +266,10 @@ impl XmlWriter {
         Ok(())
     }
 
-    /// Write metadata to XML
     fn write_metadata<W: Write>(
         &self,
         metadata: &Metadata,
-        writer: &mut Writer<W>,
+        writer: &mut quick_xml::Writer<W>,
     ) -> io::Result<()> {
         writer.write_event(Event::Start(BytesStart::new("metadata")))?;
 
@@ -303,6 +290,177 @@ impl XmlWriter {
         writer.write_event(Event::End(BytesEnd::new("permissions")))?;
 
         writer.write_event(Event::End(BytesEnd::new("metadata")))?;
+
+        Ok(())
+    }
+}
+
+impl Writer for XmlWriter {
+    fn write(&self, root_node: &DirectoryNode) -> io::Result<()> {
+        let file = File::create(&self.config.output_file)?;
+        let writer = BufWriter::new(file);
+        let mut xml_writer = quick_xml::Writer::new_with_indent(writer, b' ', 2);
+
+        // Write XML declaration
+        xml_writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
+
+        // Start directory_scan element with timestamp
+        let mut start_tag = BytesStart::new("directory_scan");
+        let timestamp = Local::now().to_rfc3339();
+        start_tag.push_attribute(("timestamp", timestamp.as_str()));
+        xml_writer.write_event(Event::Start(start_tag))?;
+
+        // Write system info
+        self.write_system_info(&mut xml_writer)?;
+
+        // Write repository structure summary
+        self.write_overview(root_node, &mut xml_writer)?;
+
+        // Write directory structure
+        self.write_directory(root_node, &mut xml_writer)?;
+
+        // End directory_scan element
+        xml_writer.write_event(Event::End(BytesEnd::new("directory_scan")))?;
+
+        Ok(())
+    }
+}
+
+/// Simple text writer for directory contents
+struct TxtWriter {
+    config: Config,
+    root_node_path: PathBuf,
+}
+
+impl TxtWriter {
+    pub fn new(config: Config) -> Self {
+        Self {
+            config,
+            root_node_path: Default::default(),
+        }
+    }
+
+    fn write_system_info<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        let hostname = hostname::get()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        writeln!(writer, "Hostname: {}", hostname)?;
+        writeln!(writer, "OS: {}", std::env::consts::OS)?;
+        writeln!(writer, "Kernel: {}", std::env::consts::FAMILY)?;
+        Ok(())
+    }
+
+    fn write_repo_info<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        if let Some(git_repo) = &self.config.git_repo {
+            writeln!(writer, "URL: {}", git_repo.url)?;
+            let host_name = match &git_repo.host {
+                GitHost::GitHub => "github.com",
+                GitHost::GitLab => "gitlab.com",
+                GitHost::Bitbucket => "bitbucket.org",
+                GitHost::Other(name) => name,
+            };
+            writeln!(writer, "Host: {}", host_name)?;
+            writeln!(writer, "Owner: {}", git_repo.owner)?;
+            writeln!(writer, "Repository: {}", git_repo.name)?;
+        }
+        Ok(())
+    }
+
+    fn write_directory<W: Write>(&self, dir: &DirectoryNode, writer: &mut W) -> io::Result<()> {
+        for node in &dir.contents {
+            match node {
+                Node::Directory(dir_node) => self.write_directory(dir_node, writer)?,
+                Node::File(file_node) => self.write_file(file_node, writer)?,
+                Node::Binary(bin_node) => self.write_binary(bin_node, writer)?,
+                Node::Symlink(sym_node) => self.write_symlink(sym_node, writer)?,
+            }
+        }
+        Ok(())
+    }
+
+    fn write_file<W: Write>(&self, file: &FileNode, writer: &mut W) -> io::Result<()> {
+        if let Some(content) = &file.content {
+            let filename = file
+                .path
+                .strip_prefix(&self.root_node_path)
+                .expect("file path should start with root_dir");
+            let extension = filename
+                .extension()
+                .map(|v| v.to_string_lossy())
+                .unwrap_or_default();
+
+            writeln!(writer, "\n================================================")?;
+            writeln!(writer, "{}", filename.display())?;
+            writeln!(writer, "================================================\n")?;
+
+            if self.config.include_metadata {
+                self.write_metadata(&file.metadata, writer)?;
+            }
+            writeln!(writer, "```{}", extension)?;
+            writeln!(writer, "{}", content)?;
+            writeln!(writer, "```")?;
+        }
+        Ok(())
+    }
+
+    fn write_binary<W: Write>(&self, binary: &BinaryNode, writer: &mut W) -> io::Result<()> {
+        if self.config.include_metadata {
+            self.write_metadata(&binary.metadata, writer)?;
+        }
+        Ok(())
+    }
+
+    fn write_symlink<W: Write>(&self, symlink: &SymlinkNode, writer: &mut W) -> io::Result<()> {
+        writeln!(
+            writer,
+            "[S] {} -> {}",
+            symlink.path.display(),
+            symlink.target
+        )?;
+        if self.config.include_metadata {
+            self.write_metadata(&symlink.metadata, writer)?;
+        }
+        Ok(())
+    }
+
+    fn write_metadata<W: Write>(&self, metadata: &Metadata, writer: &mut W) -> io::Result<()> {
+        writeln!(writer, "  Size: {}", metadata.size)?;
+        writeln!(
+            writer,
+            "  Modified: {}",
+            chrono::DateTime::<chrono::Local>::from(metadata.modified).to_rfc3339()
+        )?;
+        writeln!(writer, "  Permissions: {}", metadata.permissions)?;
+        Ok(())
+    }
+}
+
+impl Writer for TxtWriter {
+    fn write(&self, root_node: &DirectoryNode) -> io::Result<()> {
+        let file = File::create(&self.config.output_file)?;
+        let mut writer = BufWriter::new(file);
+
+        if self.config.include_metadata {
+            // Write system info section
+            writeln!(
+                writer,
+                "=================== SYSTEM INFO ==================="
+            )?;
+            self.write_system_info(&mut writer)?;
+            writeln!(writer)?;
+        }
+        // Write repository info if available
+        if self.config.git_repo.is_some() {
+            writeln!(writer, "=================== REPOSITORY ===================")?;
+            self.write_repo_info(&mut writer)?;
+            writeln!(writer)?;
+        }
+
+        // Write directory structure
+        writeln!(writer, "<codebase name=\"{}\">", root_node.name)?;
+        self.write_directory(root_node, &mut writer)?;
+        writeln!(writer, "</codebase>")?;
 
         Ok(())
     }

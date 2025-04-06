@@ -10,6 +10,7 @@ use clap_complete::Shell;
 
 use crate::git::{GitCachePolicy, GitRepoInfo};
 use crate::tokenizer::Model;
+use crate::FsWriterFormatter;
 
 /// Command-line arguments for DumpFS
 #[derive(Parser, Debug, Clone)]
@@ -25,8 +26,7 @@ pub struct Args {
     pub directory_path: String,
 
     /// Output XML file name
-    #[clap(default_value = ".dumpfs.context.xml")]
-    pub output_file: String,
+    pub output_file: Option<String>,
 
     /// Comma-separated list of patterns to ignore
     #[clap(long, value_delimiter = ',')]
@@ -74,6 +74,10 @@ pub struct Args {
     /// Copy output to clipboard
     #[clap(long, help = "print to stdout")]
     pub stdout: bool,
+
+    /// Writer format
+    #[clap(long, short)]
+    pub format: Option<FsWriterFormatter>,
 }
 
 /// Application configuration
@@ -120,14 +124,22 @@ pub struct Config {
 
     /// Copy output to clipboard
     pub stdout: bool,
+
+    pub format: FsWriterFormatter,
 }
 
 impl Config {
     /// Create configuration from command-line arguments
     pub fn from_args(args: Args) -> Self {
+        let format = args.format.unwrap_or_default();
+        let target_dir = PathBuf::from(args.directory_path.clone());
+        let output_file = args.output_file.map(Into::into).unwrap_or(match format {
+            FsWriterFormatter::Xml => target_dir.join(".dumpfs.context.xml"),
+            FsWriterFormatter::Txt => target_dir.join(".dumpfs.context.md"),
+        });
         Self {
-            target_dir: PathBuf::from(args.directory_path.clone()),
-            output_file: PathBuf::from(args.output_file),
+            target_dir,
+            output_file,
             ignore_patterns: args.ignore_patterns,
             include_patterns: args.include_patterns,
             num_threads: args.threads,
@@ -140,6 +152,7 @@ impl Config {
             include_metadata: args.include_metadata,
             stdout: args.stdout,
             clip: args.clip,
+            format,
         }
     }
 

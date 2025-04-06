@@ -3,7 +3,7 @@
  */
 
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -20,7 +20,6 @@ use dumpfs::git;
 use dumpfs::report::{ReportFormat, Reporter, ScanReport};
 use dumpfs::scanner::Scanner;
 use dumpfs::utils::count_files;
-use dumpfs::writer::XmlWriter;
 
 /// Generate shell completions
 fn print_completions(generator: Shell, cmd: &mut clap::Command) {
@@ -101,16 +100,16 @@ fn main() -> Result<()> {
     // Adjust output file location for git repositories
     if let Some(repo) = &config.git_repo {
         // Check if output file is a relative path with no directory component
-        let output_path = PathBuf::from(&args.output_file);
-        if !output_path.is_absolute()
-            && (output_path.parent().is_none()
-                || output_path
+        if !config.output_file.is_absolute()
+            && (config.output_file.parent().is_none()
+                || config
+                    .output_file
                     .parent()
                     .expect("Parent should be Some if not None")
                     == Path::new(""))
         {
             // Use the repository directory for the output file
-            config.output_file = repo.cache_path.join(output_path);
+            config.output_file = repo.cache_path.join(config.output_file);
         }
     }
 
@@ -156,7 +155,6 @@ fn main() -> Result<()> {
 
     // Create scanner and writer
     let scanner = Scanner::new(config.clone(), Arc::new(progress.clone()));
-    let writer = XmlWriter::new(config.clone());
 
     // Start timing both scan and write operations
     let start_time = Instant::now();
@@ -165,7 +163,7 @@ fn main() -> Result<()> {
     let root_node = scanner.scan()?;
 
     // Write XML output
-    writer.write(&root_node)?;
+    config.format.write(config.clone(), &root_node)?;
 
     // Calculate total duration (scan + write)
     let total_duration = start_time.elapsed();
