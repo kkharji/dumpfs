@@ -2,7 +2,11 @@
  * Progress reporting for Git operations
  */
 
+use indicatif::ProgressBar;
+
 use crate::utils::format_file_size;
+
+use super::GitRepoInfo;
 
 /// Trait for reporting Git operation progress
 pub trait ProgressReporter {
@@ -52,5 +56,32 @@ where
 {
     fn report(&self, progress: &GitProgress) {
         self(progress)
+    }
+}
+
+pub struct ProgressBarAdapter<'a> {
+    pub bar: &'a ProgressBar,
+    pub repo_info: &'a GitRepoInfo,
+    pub is_clone: bool,
+}
+
+impl ProgressReporter for ProgressBarAdapter<'_> {
+    fn report(&self, git_progress: &GitProgress) {
+        let percent = git_progress.percentage();
+
+        // Format progress message
+        let action = if self.is_clone { "Cloning" } else { "Updating" };
+        let msg = format!(
+            "{} {}/{} ({}/{}), {} downloaded",
+            action,
+            self.repo_info.owner,
+            self.repo_info.name,
+            git_progress.received_objects,
+            git_progress.total_objects,
+            git_progress.formatted_bytes()
+        );
+
+        self.bar.set_message(msg);
+        self.bar.set_position(percent as u64);
     }
 }

@@ -5,28 +5,11 @@
 use std::io;
 use std::path::PathBuf;
 
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use clap_complete::Shell;
 
-use crate::git;
+use crate::git::{GitCachePolicy, GitRepoInfo};
 use crate::tokenizer::Model;
-
-/// Policy for handling Git repository caching
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum GitCachePolicy {
-    /// Always pull latest changes for existing repositories (default)
-    AlwaysPull,
-    /// Delete and re-clone existing repositories
-    ForceClone,
-    /// Use cached repositories without pulling updates
-    UseCache,
-}
-
-impl Default for GitCachePolicy {
-    fn default() -> Self {
-        Self::AlwaysPull
-    }
-}
 
 /// Command-line arguments for DumpFS
 #[derive(Parser, Debug, Clone)]
@@ -88,6 +71,9 @@ pub struct Args {
     /// Copy output to clipboard
     #[clap(long, help = "Copy output to system clipboard")]
     pub clip: bool,
+    /// Copy output to clipboard
+    #[clap(long, help = "print to stdout")]
+    pub stdout: bool,
 }
 
 /// Application configuration
@@ -121,7 +107,7 @@ pub struct Config {
     pub repo_url: Option<String>,
 
     /// Git repository information (if applicable)
-    pub git_repo: Option<git::GitRepoInfo>,
+    pub git_repo: Option<GitRepoInfo>,
 
     /// Policy for handling Git repository caching
     pub git_cache_policy: GitCachePolicy,
@@ -131,6 +117,9 @@ pub struct Config {
 
     /// Copy output to clipboard
     pub clip: bool,
+
+    /// Copy output to clipboard
+    pub stdout: bool,
 }
 
 impl Config {
@@ -149,6 +138,7 @@ impl Config {
             git_repo: None,
             git_cache_policy: args.git_cache_policy,
             include_metadata: args.include_metadata,
+            stdout: args.stdout,
             clip: args.clip,
         }
     }

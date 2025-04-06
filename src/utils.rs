@@ -29,7 +29,7 @@ pub fn count_files(dir: &Path, config: &Config) -> io::Result<u64> {
         }
 
         for entry in walker.build().filter_map(Result::ok) {
-            if entry.file_type().map_or(false, |ft| ft.is_file())
+            if entry.file_type().is_some_and(|ft| ft.is_file())
                 && !scanner.should_ignore(entry.path())
                 && scanner.should_include(entry.path())
             {

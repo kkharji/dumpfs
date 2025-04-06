@@ -10,13 +10,33 @@ mod url;
 
 // Re-export public items
 pub use cache::clean_cache;
+use clap::ValueEnum;
 pub use error::{GitError, GitResult};
+use indicatif::{ProgressBar, ProgressStyle};
+use progress::ProgressBarAdapter;
 pub use progress::{GitProgress, ProgressReporter};
 pub use repository::{Repository, RepositoryBuilder};
 pub use url::{is_git_url, parse_git_url, GitHost, GitRepoInfo};
 
 use std::io;
 use std::path::PathBuf;
+
+/// Policy for handling Git repository caching
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum GitCachePolicy {
+    /// Always pull latest changes for existing repositories (default)
+    AlwaysPull,
+    /// Delete and re-clone existing repositories
+    ForceClone,
+    /// Use cached repositories without pulling updates
+    UseCache,
+}
+
+impl Default for GitCachePolicy {
+    fn default() -> Self {
+        Self::AlwaysPull
+    }
+}
 
 /// Clone or update a Git repository
 ///
@@ -49,6 +69,162 @@ pub fn clone_repository<P: ProgressReporter>(
         match Repository::clone(info.clone(), progress_fn) {
             Ok(repo) => Ok(repo.path().clone()),
             Err(e) => Err(io::Error::new(io::ErrorKind::Other, e.to_string())),
+        }
+    }
+}
+
+// Create a progress reporter adapter
+pub fn process_path(
+    path: &str,
+    git_cache_policy: GitCachePolicy,
+    progress: Option<&ProgressBar>,
+) -> GitResult<(PathBuf, Option<String>, Option<GitRepoInfo>)> {
+    // If not a Git URL, just return the path as is
+    if !is_git_url(path) {
+        return Ok((PathBuf::from(path), None, None));
+    }
+
+    // Parse the Git URL
+    let repo_info = parse_git_url(path)?;
+
+    // Use the provided progress bar or create a new one
+    let progress_bar = match progress {
+        Some(p) => p,
+        None => {
+            // Create a new progress bar if none is provided
+            let new_bar = ProgressBar::new(100);
+            new_bar.set_style(ProgressStyle::default_bar().template(
+                "{spinner:.green} {prefix:.bold.cyan} {msg} [{bar:40.cyan/blue}] {percent}%",
+            )?);
+
+            // Since this is a temporary variable, we'll just leak it to avoid ownership issues
+            Box::leak(Box::new(new_bar))
+        }
+    };
+
+    // Check if repository already exists
+    let repo_exists = Repository::exists(&repo_info);
+
+    // Handle based on policy
+    match (git_cache_policy, repo_exists) {
+        // Repository doesn't exist, always clone
+        (_, false) => {
+            progress_bar.set_prefix("🔄 Cloning");
+            progress_bar.set_message(format!(
+                "Cloning repository: {}/{}",
+                repo_info.owner, repo_info.name
+            ));
+
+            let reporter = ProgressBarAdapter {
+                bar: progress_bar,
+                repo_info: &repo_info,
+                is_clone: true,
+            };
+
+            let repo = Repository::clone(repo_info.clone(), Some(&reporter))
+                .inspect(|_| {
+                    progress_bar.finish_with_message(format!(
+                        "Repository cloned: {}/{}",
+                        repo_info.owner, repo_info.name
+                    ));
+                })
+                .inspect_err(|e| {
+                    progress_bar.abandon_with_message(format!("Failed to clone repository: {}", e));
+                })?;
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+        }
+
+        // Force clone even if exists
+        (GitCachePolicy::ForceClone, true) => {
+            // Delete existing repo
+            progress_bar.set_prefix("🗑️ Removing");
+            progress_bar.set_message(format!(
+                "Removing existing repository: {}/{}",
+                repo_info.owner, repo_info.name
+            ));
+
+            // Remove the directory to force a fresh clone
+            std::fs::remove_dir_all(&repo_info.cache_path).inspect_err(|e| {
+                progress_bar
+                    .abandon_with_message(format!("Failed to remove existing repository: {}", e));
+            })?;
+
+            // Clone the repository
+            progress_bar.set_prefix("🔄 Cloning");
+            progress_bar.set_message(format!(
+                "Cloning repository: {}/{}",
+                repo_info.owner, repo_info.name
+            ));
+
+            let reporter = ProgressBarAdapter {
+                bar: progress_bar,
+                repo_info: &repo_info,
+                is_clone: true,
+            };
+
+            let repo = Repository::clone(repo_info.clone(), Some(&reporter))
+                .inspect_err(|e| {
+                    progress_bar.abandon_with_message(format!("Failed to clone repository: {}", e))
+                })
+                .inspect(|_| {
+                    progress_bar.finish_with_message(format!(
+                        "Repository cloned: {}/{}",
+                        repo_info.owner, repo_info.name
+                    ))
+                })?;
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+        }
+
+        // Pull if exists
+        (GitCachePolicy::AlwaysPull, true) => {
+            progress_bar.set_prefix("🔄 Updating");
+            progress_bar.set_message(format!(
+                "Updating repository: {}/{}",
+                repo_info.owner, repo_info.name
+            ));
+
+            let reporter = ProgressBarAdapter {
+                bar: progress_bar,
+                repo_info: &repo_info,
+                is_clone: false,
+            };
+
+            let mut repo = Repository::open(repo_info.clone()).inspect_err(|e| {
+                progress_bar.abandon_with_message(format!("Failed to open repository: {}", e));
+            })?;
+
+            repo.pull(Some(&reporter)).inspect_err(|e| {
+                progress_bar.abandon_with_message(format!("Failed to update repository: {}", e))
+            })?;
+
+            progress_bar.finish_with_message(format!(
+                "Repository updated: {}/{}",
+                repo_info.owner, repo_info.name
+            ));
+
+            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
+        }
+
+        // Use cache without pulling
+        (GitCachePolicy::UseCache, true) => {
+            progress_bar.set_prefix("📂 Using cached");
+            progress_bar.set_message(format!(
+                "Using cached repository: {}/{}",
+                repo_info.owner, repo_info.name
+            ));
+
+            progress_bar.finish_with_message(format!(
+                "Using cached repository: {}/{}",
+                repo_info.owner, repo_info.name
+            ));
+
+            Ok((
+                repo_info.cache_path.clone(),
+                Some(path.to_string()),
+                Some(repo_info),
+            ))
         }
     }
 }

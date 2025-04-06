@@ -2,7 +2,7 @@
  * Command-line interface for DumpFS
  */
 
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -15,8 +15,8 @@ use clap_complete::{generate, CompleteEnv, Shell};
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::ThreadPoolBuilder;
 
-use dumpfs::config::{Args, Config, GitCachePolicy};
-use dumpfs::git::{self, GitRepoInfo};
+use dumpfs::config::{Args, Config};
+use dumpfs::git;
 use dumpfs::report::{ReportFormat, Reporter, ScanReport};
 use dumpfs::scanner::Scanner;
 use dumpfs::utils::count_files;
@@ -30,214 +30,6 @@ fn print_completions(generator: Shell, cmd: &mut clap::Command) {
         cmd.get_name().to_string(),
         &mut io::stdout(),
     );
-}
-
-/// Process a path that could be a local directory or a Git repository URL
-///
-/// Arguments:
-/// - path: The path or URL to process
-/// - git_cache_policy: Policy for handling Git repository caching
-/// - progress: Optional progress bar for reporting (will create one if None)
-///
-/// Returns:
-/// - The target directory path (local or cloned repo)
-/// - Optional repository information if it's a Git URL
-fn process_path(
-    path: &str,
-    git_cache_policy: GitCachePolicy,
-    progress: Option<&ProgressBar>,
-) -> Result<(PathBuf, Option<String>, Option<GitRepoInfo>)> {
-    // If not a Git URL, just return the path as is
-    if !git::is_git_url(path) {
-        return Ok((PathBuf::from(path), None, None));
-    }
-
-    // Parse the Git URL
-    let repo_info = git::parse_git_url(path)
-        .map_err(|e| DumpFsError::InvalidArgument(format!("Invalid Git URL: {}", e)))?;
-
-    // Create a progress reporter adapter
-    struct ProgressBarAdapter<'a> {
-        bar: &'a ProgressBar,
-        repo_info: &'a GitRepoInfo,
-        is_clone: bool,
-    }
-
-    impl<'a> git::ProgressReporter for ProgressBarAdapter<'a> {
-        fn report(&self, git_progress: &git::GitProgress) {
-            let percent = git_progress.percentage();
-
-            // Format progress message
-            let action = if self.is_clone { "Cloning" } else { "Updating" };
-            let msg = format!(
-                "{} {}/{} ({}/{}), {} downloaded",
-                action,
-                self.repo_info.owner,
-                self.repo_info.name,
-                git_progress.received_objects,
-                git_progress.total_objects,
-                git_progress.formatted_bytes()
-            );
-
-            self.bar.set_message(msg);
-            self.bar.set_position(percent as u64);
-        }
-    }
-
-    // Use the provided progress bar or create a new one
-    let progress_bar = match progress {
-        Some(p) => p,
-        None => {
-            // Create a new progress bar if none is provided
-            let new_bar = ProgressBar::new(100);
-            new_bar.set_style(
-                ProgressStyle::default_bar()
-                    .template("{spinner:.green} {prefix:.bold.cyan} {msg} [{bar:40.cyan/blue}] {percent}%")
-                    .map_err(|e| DumpFsError::Unexpected(format!("Failed to create progress bar style: {}", e)))?
-            );
-
-            // Since this is a temporary variable, we'll just leak it to avoid ownership issues
-            Box::leak(Box::new(new_bar))
-        }
-    };
-
-    // Check if repository already exists
-    let repo_exists = git::Repository::exists(&repo_info);
-
-    // Handle based on policy
-    match (git_cache_policy, repo_exists) {
-        // Repository doesn't exist, always clone
-        (_, false) => {
-            progress_bar.set_prefix("🔄 Cloning");
-            progress_bar.set_message(format!(
-                "Cloning repository: {}/{}",
-                repo_info.owner, repo_info.name
-            ));
-
-            let reporter = ProgressBarAdapter {
-                bar: progress_bar,
-                repo_info: &repo_info,
-                is_clone: true,
-            };
-
-            let repo = match git::Repository::clone(repo_info.clone(), Some(&reporter)) {
-                Ok(repo) => {
-                    progress_bar.finish_with_message(format!(
-                        "Repository cloned: {}/{}",
-                        repo_info.owner, repo_info.name
-                    ));
-                    repo
-                }
-                Err(e) => {
-                    progress_bar.abandon_with_message(format!("Failed to clone repository: {}", e));
-                    return Err(DumpFsError::Git(e));
-                }
-            };
-
-            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
-        }
-
-        // Force clone even if exists
-        (GitCachePolicy::ForceClone, true) => {
-            // Delete existing repo
-            progress_bar.set_prefix("🗑️ Removing");
-            progress_bar.set_message(format!(
-                "Removing existing repository: {}/{}",
-                repo_info.owner, repo_info.name
-            ));
-
-            // Remove the directory to force a fresh clone
-            if let Err(e) = std::fs::remove_dir_all(&repo_info.cache_path) {
-                progress_bar
-                    .abandon_with_message(format!("Failed to remove existing repository: {}", e));
-                return Err(DumpFsError::Io(e));
-            }
-
-            // Clone the repository
-            progress_bar.set_prefix("🔄 Cloning");
-            progress_bar.set_message(format!(
-                "Cloning repository: {}/{}",
-                repo_info.owner, repo_info.name
-            ));
-
-            let reporter = ProgressBarAdapter {
-                bar: progress_bar,
-                repo_info: &repo_info,
-                is_clone: true,
-            };
-
-            let repo = match git::Repository::clone(repo_info.clone(), Some(&reporter)) {
-                Ok(repo) => {
-                    progress_bar.finish_with_message(format!(
-                        "Repository cloned: {}/{}",
-                        repo_info.owner, repo_info.name
-                    ));
-                    repo
-                }
-                Err(e) => {
-                    progress_bar.abandon_with_message(format!("Failed to clone repository: {}", e));
-                    return Err(DumpFsError::Git(e));
-                }
-            };
-
-            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
-        }
-
-        // Pull if exists
-        (GitCachePolicy::AlwaysPull, true) => {
-            progress_bar.set_prefix("🔄 Updating");
-            progress_bar.set_message(format!(
-                "Updating repository: {}/{}",
-                repo_info.owner, repo_info.name
-            ));
-
-            let reporter = ProgressBarAdapter {
-                bar: progress_bar,
-                repo_info: &repo_info,
-                is_clone: false,
-            };
-
-            let mut repo = match git::Repository::open(repo_info.clone()) {
-                Ok(repo) => repo,
-                Err(e) => {
-                    progress_bar.abandon_with_message(format!("Failed to open repository: {}", e));
-                    return Err(DumpFsError::Git(e));
-                }
-            };
-
-            if let Err(e) = repo.pull(Some(&reporter)) {
-                progress_bar.abandon_with_message(format!("Failed to update repository: {}", e));
-                return Err(DumpFsError::Git(e));
-            }
-
-            progress_bar.finish_with_message(format!(
-                "Repository updated: {}/{}",
-                repo_info.owner, repo_info.name
-            ));
-
-            Ok((repo.path().clone(), Some(path.to_string()), Some(repo_info)))
-        }
-
-        // Use cache without pulling
-        (GitCachePolicy::UseCache, true) => {
-            progress_bar.set_prefix("📂 Using cached");
-            progress_bar.set_message(format!(
-                "Using cached repository: {}/{}",
-                repo_info.owner, repo_info.name
-            ));
-
-            progress_bar.finish_with_message(format!(
-                "Using cached repository: {}/{}",
-                repo_info.owner, repo_info.name
-            ));
-
-            Ok((
-                repo_info.cache_path.clone(),
-                Some(path.to_string()),
-                Some(repo_info),
-            ))
-        }
-    }
 }
 
 fn main() -> Result<()> {
@@ -288,7 +80,7 @@ fn main() -> Result<()> {
 
     // Process path (either local directory or git repository URL)
     progress.set_message(format!("Processing path: {}", args.directory_path));
-    let (processed_path, repo_url, git_repo) = match process_path(
+    let (processed_path, repo_url, git_repo) = match git::process_path(
         &args.directory_path,
         config.git_cache_policy,
         Some(&progress),
@@ -297,7 +89,7 @@ fn main() -> Result<()> {
         Err(e) => {
             progress.abandon_with_message(format!("Error processing path: {}", e));
             eprintln!("Error processing path: {}", e);
-            return Err(e);
+            return Err(e.into());
         }
     };
 
@@ -402,18 +194,23 @@ fn main() -> Result<()> {
     reporter.print_report(&scan_report);
 
     // Handle clipboard functionality if --clip is specified
-    if config.clip {
+    if config.clip || config.stdout {
         // Get the output file content
         let output_content = std::fs::read_to_string(&config.output_file)?;
+        if config.stdout {
+            std::io::stdout().write_all(output_content.as_bytes())?;
+        }
 
-        // Copy to clipboard
-        match clipboard::copy_to_clipboard(&output_content) {
-            Ok(_) => {
-                eprintln!("✅ Output copied to clipboard successfully");
-            }
-            Err(e) => {
-                eprintln!("❌ Failed to copy to clipboard: {}", e);
-                // Don't return error as the main functionality (file generation) succeeded
+        if config.clip {
+            // Copy to clipboard
+            match clipboard::copy_to_clipboard(&output_content) {
+                Ok(_) => {
+                    eprintln!("✅ Output copied to clipboard successfully");
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to copy to clipboard: {}", e);
+                    // Don't return error as the main functionality (file generation) succeeded
+                }
             }
         }
     }

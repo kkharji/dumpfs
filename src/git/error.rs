@@ -2,6 +2,7 @@
  * Error types for Git operations
  */
 
+use indicatif::style::TemplateError;
 use thiserror::Error;
 
 /// Errors that can occur during Git operations
@@ -34,6 +35,10 @@ pub enum GitError {
     /// Repository not found
     #[error("Repository not found: {0}")]
     NotFound(String),
+
+    /// Progress Error
+    #[error("Progress Template failed to be parssed: {0}")]
+    TemplateError(#[from] TemplateError),
 }
 
 /// Specialized Result type for Git operations
